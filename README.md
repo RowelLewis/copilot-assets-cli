@@ -1,5 +1,7 @@
 # copilot-assets
 
+[![NuGet](https://img.shields.io/nuget/v/copilot-assets.svg)](https://www.nuget.org/packages/copilot-assets)
+
 A .NET global tool for installing and managing GitHub Copilot assets (prompts, agents, instructions, skills) in your projects.
 
 ## Installation
