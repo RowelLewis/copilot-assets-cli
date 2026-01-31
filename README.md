@@ -4,21 +4,6 @@ A .NET global tool for installing and managing GitHub Copilot assets (prompts, a
 
 ## Installation
 
-### From Azure DevOps Artifacts (Private Feed)
-
-```bash
-# Add your private feed (one-time setup)
-dotnet nuget add source "https://pkgs.dev.azure.com/{org}/{project}/_packaging/{feed}/nuget/v3/index.json" \
-  --name "MyOrgFeed" \
-  --username "AzureDevOps" \
-  --password "{PAT_TOKEN}"
-
-# Install the tool globally
-dotnet tool install -g copilot-assets --add-source MyOrgFeed
-```
-
-### From NuGet.org (Public)
-
 ```bash
 dotnet tool install -g copilot-assets
 ```
