@@ -8,10 +8,10 @@
     <!-- NuGet Tool Package Configuration -->
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>copilot-assets</ToolCommandName>
-    <PackageId>devtools.copilot-assets</PackageId>
+    <PackageId>copilot-assets</PackageId>
     <Version>1.0.0</Version>
     <Description>GitHub Copilot Asset Distribution Tool - Install and sync Copilot prompts, agents, instructions, and skills</Description>
-    <PackageProjectUrl>https://github.com/org/copilot-assets-cli</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/RowelLewis/copilot-assets-cli</PackageProjectUrl>
     <PackageTags>copilot;github;devtools;cli</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
