@@ -38,8 +38,8 @@ public sealed class PolicyAppService : IPolicyAppService
             return result;
         }
 
-        // Sync assets
-        var syncResult = _syncEngine.SyncAssets(targetDir, options.Force);
+        // Sync assets with optional filter
+        var syncResult = _syncEngine.SyncAssets(targetDir, options.Force, options.Filter);
 
         if (!syncResult.Success)
         {
@@ -101,7 +101,7 @@ public sealed class PolicyAppService : IPolicyAppService
         }
 
         // Sync with force to update
-        var syncResult = _syncEngine.SyncAssets(targetDir, force: true);
+        var syncResult = _syncEngine.SyncAssets(targetDir, force: true, options.Filter);
 
         if (!syncResult.Success)
         {
@@ -186,5 +186,326 @@ public sealed class PolicyAppService : IPolicyAppService
         }
 
         return await Task.FromResult(result);
+    }
+
+    /// <inheritdoc />
+    public async Task<AssetListResult> ListAssetsAsync(ListOptions options)
+    {
+        var targetDir = _fileSystem.GetFullPath(options.TargetDirectory);
+        var manifest = _syncEngine.ReadManifest(targetDir);
+
+        if (manifest == null)
+        {
+            return new AssetListResult(
+                ProjectPath: targetDir,
+                Assets: [],
+                Summary: new AssetSummary(0, 0, 0, 0));
+        }
+
+        var assets = new List<AssetInfo>();
+        int valid = 0, modified = 0, missing = 0;
+
+        foreach (var assetPath in manifest.Assets)
+        {
+            // Skip manifest file itself
+            if (assetPath == Manifest.FileName)
+                continue;
+
+            var category = AssetTypeFilter.GetCategory(assetPath);
+
+            // Apply filter if specified
+            if (options.Filter != null && !options.Filter.ShouldInclude(category))
+                continue;
+
+            var fullPath = _fileSystem.CombinePath(targetDir, ".github", assetPath);
+            var name = Path.GetFileName(assetPath);
+            var type = category.ToString().ToLowerInvariant();
+
+            if (!_fileSystem.Exists(fullPath))
+            {
+                assets.Add(new AssetInfo(
+                    Type: type,
+                    Name: name,
+                    Path: assetPath,
+                    Valid: false,
+                    Reason: "missing"));
+                missing++;
+                continue;
+            }
+
+            var currentChecksum = _fileSystem.ComputeChecksum(fullPath);
+            var expectedChecksum = manifest.Checksums.GetValueOrDefault(assetPath);
+            var isValid = currentChecksum == expectedChecksum;
+
+            assets.Add(new AssetInfo(
+                Type: type,
+                Name: name,
+                Path: assetPath,
+                Valid: isValid,
+                Checksum: currentChecksum,
+                Reason: isValid ? null : "modified"));
+
+            if (isValid) valid++;
+            else modified++;
+        }
+
+        return await Task.FromResult(new AssetListResult(
+            ProjectPath: targetDir,
+            Assets: assets,
+            Summary: new AssetSummary(assets.Count, valid, modified, missing)));
+    }
+
+    /// <inheritdoc />
+    public async Task<VerifyResult> VerifyAsync(VerifyOptions options)
+    {
+        var targetDir = _fileSystem.GetFullPath(options.TargetDirectory);
+        var manifest = _syncEngine.ReadManifest(targetDir);
+
+        if (manifest == null)
+        {
+            return await Task.FromResult(VerifyResult.NoManifest());
+        }
+
+        var results = new List<VerifyAssetResult>();
+        var warnings = new List<string>();
+
+        foreach (var assetPath in manifest.Assets)
+        {
+            // Skip manifest file itself
+            if (assetPath == Manifest.FileName)
+                continue;
+
+            var category = AssetTypeFilter.GetCategory(assetPath);
+
+            // Apply filter
+            if (options.Filter != null && !options.Filter.ShouldInclude(category))
+                continue;
+
+            var fullPath = _fileSystem.CombinePath(targetDir, ".github", assetPath);
+            var name = Path.GetFileName(assetPath);
+            var type = category.ToString().ToLowerInvariant();
+            var expectedChecksum = manifest.Checksums.GetValueOrDefault(assetPath);
+
+            if (!_fileSystem.Exists(fullPath))
+            {
+                if (options.Restore)
+                {
+                    // Restore missing file
+                    await RestoreAssetAsync(assetPath, fullPath);
+                    results.Add(new VerifyAssetResult(
+                        Type: type, Name: name, Path: assetPath,
+                        Status: VerifyStatus.Restored,
+                        ExpectedChecksum: expectedChecksum,
+                        ActualChecksum: expectedChecksum));
+                }
+                else
+                {
+                    results.Add(new VerifyAssetResult(
+                        Type: type, Name: name, Path: assetPath,
+                        Status: VerifyStatus.Missing,
+                        ExpectedChecksum: expectedChecksum,
+                        ActualChecksum: null));
+                }
+                continue;
+            }
+
+            var actualChecksum = _fileSystem.ComputeChecksum(fullPath);
+            var isValid = actualChecksum == expectedChecksum;
+
+            if (isValid)
+            {
+                results.Add(new VerifyAssetResult(
+                    Type: type, Name: name, Path: assetPath,
+                    Status: VerifyStatus.Valid,
+                    ExpectedChecksum: expectedChecksum,
+                    ActualChecksum: actualChecksum));
+            }
+            else if (options.Restore)
+            {
+                // Restore modified file
+                await RestoreAssetAsync(assetPath, fullPath);
+                results.Add(new VerifyAssetResult(
+                    Type: type, Name: name, Path: assetPath,
+                    Status: VerifyStatus.Restored,
+                    ExpectedChecksum: expectedChecksum,
+                    ActualChecksum: expectedChecksum));
+            }
+            else
+            {
+                results.Add(new VerifyAssetResult(
+                    Type: type, Name: name, Path: assetPath,
+                    Status: VerifyStatus.Modified,
+                    ExpectedChecksum: expectedChecksum,
+                    ActualChecksum: actualChecksum));
+                warnings.Add($"{name} has been modified locally");
+            }
+        }
+
+        return await Task.FromResult(VerifyResult.FromAssets(results, warnings: warnings));
+    }
+
+    private Task RestoreAssetAsync(string relativePath, string targetPath)
+    {
+        var templatesPath = _syncEngine.GetTemplatesPath();
+        var templateFile = _fileSystem.CombinePath(templatesPath, relativePath);
+
+        // Ensure directory exists
+        var directory = Path.GetDirectoryName(targetPath);
+        if (!string.IsNullOrEmpty(directory))
+            _fileSystem.CreateDirectory(directory);
+
+        // Copy from template
+        _fileSystem.CopyFile(templateFile, targetPath, overwrite: true);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public async Task<DryRunResult> PreviewInitAsync(InitOptions options)
+    {
+        var operations = new List<PlannedOperation>();
+        var targetDir = _fileSystem.GetFullPath(options.TargetDirectory);
+        var targetGitHubPath = _fileSystem.CombinePath(targetDir, ".github");
+        var manifestPath = _fileSystem.CombinePath(targetDir, Manifest.RelativePath);
+
+        // Check if already initialized
+        var existingManifest = _syncEngine.ReadManifest(targetDir);
+        if (existingManifest != null && !options.Force)
+        {
+            operations.Add(new PlannedOperation(
+                OperationType.Skip,
+                targetGitHubPath,
+                "Already initialized. Use --force to overwrite."));
+            return await Task.FromResult(DryRunResult.FromOperations(operations));
+        }
+
+        // Get templates and preview what would be created
+        var templatesPath = _syncEngine.GetTemplatesPath();
+        if (!_fileSystem.Exists(templatesPath))
+        {
+            operations.Add(new PlannedOperation(
+                OperationType.Skip,
+                templatesPath,
+                "Templates directory not found"));
+            return await Task.FromResult(DryRunResult.FromOperations(operations));
+        }
+
+        var templateFiles = _fileSystem.GetFiles(templatesPath, "*", recursive: true);
+
+        foreach (var templateFile in templateFiles)
+        {
+            var relativePath = Path.GetRelativePath(templatesPath, templateFile);
+
+            // Apply filter
+            if (options.Filter != null && !options.Filter.ShouldIncludePath(relativePath))
+                continue;
+
+            var targetPath = _fileSystem.CombinePath(targetGitHubPath, relativePath);
+
+            if (_fileSystem.Exists(targetPath))
+            {
+                if (options.Force)
+                {
+                    var sourceChecksum = _fileSystem.ComputeChecksum(templateFile);
+                    var targetChecksum = _fileSystem.ComputeChecksum(targetPath);
+
+                    if (sourceChecksum != targetChecksum)
+                    {
+                        operations.Add(new PlannedOperation(
+                            OperationType.Update,
+                            relativePath,
+                            "content differs"));
+                    }
+                    else
+                    {
+                        operations.Add(new PlannedOperation(
+                            OperationType.Skip,
+                            relativePath,
+                            "unchanged"));
+                    }
+                }
+                else
+                {
+                    operations.Add(new PlannedOperation(
+                        OperationType.Skip,
+                        relativePath,
+                        "exists"));
+                }
+            }
+            else
+            {
+                operations.Add(new PlannedOperation(
+                    OperationType.Create,
+                    relativePath));
+            }
+        }
+
+        // Check gitignore
+        var gitignorePath = _fileSystem.CombinePath(targetDir, ".gitignore");
+        if (_fileSystem.Exists(gitignorePath))
+        {
+            var content = _fileSystem.ReadAllText(gitignorePath);
+            if (!content.Contains(".copilot-assets.json"))
+            {
+                operations.Add(new PlannedOperation(
+                    OperationType.Modify,
+                    ".gitignore",
+                    "append entry"));
+            }
+        }
+
+        // Manifest
+        if (!_fileSystem.Exists(manifestPath))
+        {
+            operations.Add(new PlannedOperation(
+                OperationType.Create,
+                Manifest.FileName));
+        }
+        else if (options.Force)
+        {
+            operations.Add(new PlannedOperation(
+                OperationType.Update,
+                Manifest.FileName,
+                "update manifest"));
+        }
+
+        return await Task.FromResult(DryRunResult.FromOperations(operations));
+    }
+
+    /// <inheritdoc />
+    public async Task<DryRunResult> PreviewUpdateAsync(UpdateOptions options)
+    {
+        var operations = new List<PlannedOperation>();
+        var targetDir = _fileSystem.GetFullPath(options.TargetDirectory);
+
+        // Check if initialized
+        var existingManifest = _syncEngine.ReadManifest(targetDir);
+        if (existingManifest == null)
+        {
+            operations.Add(new PlannedOperation(
+                OperationType.Skip,
+                ".",
+                "Assets not installed. Run 'copilot-assets init' first."));
+            return await Task.FromResult(DryRunResult.FromOperations(operations));
+        }
+
+        // Check if update is needed
+        if (existingManifest.Version == SyncEngine.AssetVersion && !options.Force)
+        {
+            operations.Add(new PlannedOperation(
+                OperationType.Skip,
+                ".",
+                $"Already at latest version ({SyncEngine.AssetVersion})"));
+            return await Task.FromResult(DryRunResult.FromOperations(operations));
+        }
+
+        // Preview update like init with force
+        var initOptions = new InitOptions
+        {
+            TargetDirectory = options.TargetDirectory,
+            Force = true,
+            Filter = options.Filter
+        };
+
+        return await PreviewInitAsync(initOptions);
     }
 }

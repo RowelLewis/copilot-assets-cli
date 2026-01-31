@@ -48,14 +48,24 @@ public static class Program
     {
         var policyService = services.GetRequiredService<IPolicyAppService>();
 
+        // Global --json option
+        var jsonOption = new Option<bool>(
+            "--json",
+            "Output results as JSON");
+
         var rootCommand = new RootCommand("Copilot Assets CLI - GitHub Copilot Asset Distribution Tool")
         {
-            InitCommand.Create(policyService),
-            UpdateCommand.Create(policyService),
-            ValidateCommand.Create(policyService),
-            DoctorCommand.Create(policyService),
-            VersionCommand.Create()
+            InitCommand.Create(policyService, jsonOption),
+            UpdateCommand.Create(policyService, jsonOption),
+            ValidateCommand.Create(policyService, jsonOption),
+            ListCommand.Create(policyService, jsonOption),
+            VerifyCommand.Create(policyService, jsonOption),
+            DoctorCommand.Create(policyService, jsonOption),
+            VersionCommand.Create(jsonOption)
         };
+
+        // Add global option
+        rootCommand.AddGlobalOption(jsonOption);
 
         return rootCommand;
     }

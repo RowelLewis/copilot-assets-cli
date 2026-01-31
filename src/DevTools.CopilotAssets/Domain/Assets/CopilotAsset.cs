@@ -31,13 +31,4 @@ public sealed record CopilotAsset
     public string? Checksum { get; init; }
 }
 
-/// <summary>
-/// Categories of Copilot assets.
-/// </summary>
-public enum AssetType
-{
-    Instruction,
-    Prompt,
-    Agent,
-    Skill
-}
+

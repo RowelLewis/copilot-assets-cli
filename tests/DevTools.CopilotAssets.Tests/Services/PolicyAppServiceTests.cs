@@ -230,4 +230,240 @@ public class PolicyAppServiceTests
         result.HasIssues.Should().BeTrue();
         result.Issues.Should().Contain(i => i.Contains("Git"));
     }
+
+    [Fact]
+    public async Task ListAssetsAsync_WhenNoManifest_ShouldReturnEmpty()
+    {
+        // Arrange
+        _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
+        _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
+            .Returns<string[]>(paths => string.Join("/", paths));
+        _mockFileSystem.Setup(f => f.Exists(It.IsAny<string>())).Returns(false);
+
+        var options = new ListOptions { TargetDirectory = "." };
+
+        // Act
+        var result = await _sut.ListAssetsAsync(options);
+
+        // Assert
+        result.Assets.Should().BeEmpty();
+        result.Summary.Total.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ListAssetsAsync_WithManifest_ShouldReturnAssets()
+    {
+        // Arrange
+        var manifest = new Manifest
+        {
+            Version = "1.0.0",
+            ToolVersion = "1.0.0",
+            InstalledAt = DateTime.UtcNow,
+            Assets = ["prompts/test.md", ".copilot-assets.json"],
+            Checksums = new Dictionary<string, string>
+            {
+                ["prompts/test.md"] = "checksum123"
+            }
+        };
+
+        _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
+        _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
+            .Returns<string[]>(paths => string.Join("/", paths));
+        _mockFileSystem.Setup(f => f.Exists(It.Is<string>(s => s.Contains(".copilot-assets.json"))))
+            .Returns(true);
+        _mockFileSystem.Setup(f => f.Exists(It.Is<string>(s => s.Contains("prompts/test.md"))))
+            .Returns(true);
+        _mockFileSystem.Setup(f => f.ReadAllText(It.Is<string>(s => s.Contains(".copilot-assets.json"))))
+            .Returns(manifest.ToJson());
+        _mockFileSystem.Setup(f => f.ComputeChecksum(It.Is<string>(s => s.Contains("test.md"))))
+            .Returns("checksum123");
+
+        var options = new ListOptions { TargetDirectory = "." };
+
+        // Act
+        var result = await _sut.ListAssetsAsync(options);
+
+        // Assert
+        result.Assets.Should().HaveCount(1);
+        result.Assets[0].Name.Should().Be("test.md");
+        result.Assets[0].Type.Should().Be("prompts");
+        result.Assets[0].Valid.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ListAssetsAsync_WithFilter_ShouldFilterResults()
+    {
+        // Arrange
+        var manifest = new Manifest
+        {
+            Version = "1.0.0",
+            ToolVersion = "1.0.0",
+            InstalledAt = DateTime.UtcNow,
+            Assets = ["prompts/test.md", "agents/agent.md", ".copilot-assets.json"],
+            Checksums = new Dictionary<string, string>
+            {
+                ["prompts/test.md"] = "checksum1",
+                ["agents/agent.md"] = "checksum2"
+            }
+        };
+
+        _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
+        _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
+            .Returns<string[]>(paths => string.Join("/", paths));
+        _mockFileSystem.Setup(f => f.Exists(It.IsAny<string>())).Returns(true);
+        _mockFileSystem.Setup(f => f.ReadAllText(It.Is<string>(s => s.Contains(".copilot-assets.json"))))
+            .Returns(manifest.ToJson());
+        _mockFileSystem.Setup(f => f.ComputeChecksum(It.IsAny<string>())).Returns("checksum1");
+
+        var filter = AssetTypeFilter.ParseOnly("prompts").Filter;
+        var options = new ListOptions { TargetDirectory = ".", Filter = filter };
+
+        // Act
+        var result = await _sut.ListAssetsAsync(options);
+
+        // Assert
+        result.Assets.Should().HaveCount(1);
+        result.Assets[0].Type.Should().Be("prompts");
+    }
+
+    [Fact]
+    public async Task VerifyAsync_WhenNoManifest_ShouldReturnError()
+    {
+        // Arrange
+        _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
+        _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
+            .Returns<string[]>(paths => string.Join("/", paths));
+        _mockFileSystem.Setup(f => f.Exists(It.IsAny<string>())).Returns(false);
+
+        var options = new VerifyOptions { TargetDirectory = "." };
+
+        // Act
+        var result = await _sut.VerifyAsync(options);
+
+        // Assert
+        result.ExitCode.Should().Be(1);
+        result.Errors.Should().Contain(e => e.Contains("manifest"));
+    }
+
+    [Fact]
+    public async Task VerifyAsync_WithValidAssets_ShouldReturnZeroExitCode()
+    {
+        // Arrange
+        var manifest = new Manifest
+        {
+            Version = "1.0.0",
+            ToolVersion = "1.0.0",
+            InstalledAt = DateTime.UtcNow,
+            Assets = ["prompts/test.md", ".copilot-assets.json"],
+            Checksums = new Dictionary<string, string>
+            {
+                ["prompts/test.md"] = "checksum123"
+            }
+        };
+
+        _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
+        _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
+            .Returns<string[]>(paths => string.Join("/", paths));
+        _mockFileSystem.Setup(f => f.Exists(It.IsAny<string>())).Returns(true);
+        _mockFileSystem.Setup(f => f.ReadAllText(It.Is<string>(s => s.Contains(".copilot-assets.json"))))
+            .Returns(manifest.ToJson());
+        _mockFileSystem.Setup(f => f.ComputeChecksum(It.Is<string>(s => s.Contains("test.md"))))
+            .Returns("checksum123");
+
+        var options = new VerifyOptions { TargetDirectory = "." };
+
+        // Act
+        var result = await _sut.VerifyAsync(options);
+
+        // Assert
+        result.ExitCode.Should().Be(0);
+        result.Assets.Should().HaveCount(1);
+        result.Assets[0].Status.Should().Be(VerifyStatus.Valid);
+    }
+
+    [Fact]
+    public async Task VerifyAsync_WithModifiedAsset_ShouldReturnOneExitCode()
+    {
+        // Arrange
+        var manifest = new Manifest
+        {
+            Version = "1.0.0",
+            ToolVersion = "1.0.0",
+            InstalledAt = DateTime.UtcNow,
+            Assets = ["prompts/test.md", ".copilot-assets.json"],
+            Checksums = new Dictionary<string, string>
+            {
+                ["prompts/test.md"] = "original-checksum"
+            }
+        };
+
+        _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
+        _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
+            .Returns<string[]>(paths => string.Join("/", paths));
+        _mockFileSystem.Setup(f => f.Exists(It.IsAny<string>())).Returns(true);
+        _mockFileSystem.Setup(f => f.ReadAllText(It.Is<string>(s => s.Contains(".copilot-assets.json"))))
+            .Returns(manifest.ToJson());
+        _mockFileSystem.Setup(f => f.ComputeChecksum(It.Is<string>(s => s.Contains("test.md"))))
+            .Returns("modified-checksum"); // Different checksum
+
+        var options = new VerifyOptions { TargetDirectory = "." };
+
+        // Act
+        var result = await _sut.VerifyAsync(options);
+
+        // Assert
+        result.ExitCode.Should().Be(1);
+        result.Assets.Should().HaveCount(1);
+        result.Assets[0].Status.Should().Be(VerifyStatus.Modified);
+    }
+
+    [Fact]
+    public async Task PreviewInitAsync_WhenNotInitialized_ShouldShowCreates()
+    {
+        // Arrange
+        _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
+        _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
+            .Returns<string[]>(paths => string.Join("/", paths));
+        _mockFileSystem.Setup(f => f.Exists(It.Is<string>(s => s.Contains("templates")))).Returns(true);
+        _mockFileSystem.Setup(f => f.Exists(It.Is<string>(s => !s.Contains("templates")))).Returns(false);
+        _mockFileSystem.Setup(f => f.GetFiles(It.IsAny<string>(), "*", true))
+            .Returns(new[] { "/templates/prompts/test.md" });
+
+        var options = new InitOptions { TargetDirectory = "." };
+
+        // Act
+        var result = await _sut.PreviewInitAsync(options);
+
+        // Assert
+        result.Summary.Creates.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task PreviewInitAsync_WhenAlreadyInitialized_WithoutForce_ShouldShowSkip()
+    {
+        // Arrange
+        var manifest = new Manifest
+        {
+            Version = "1.0.0",
+            ToolVersion = "1.0.0",
+            InstalledAt = DateTime.UtcNow
+        };
+
+        _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
+        _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
+            .Returns<string[]>(paths => string.Join("/", paths));
+        _mockFileSystem.Setup(f => f.Exists(It.Is<string>(s => s.Contains(".copilot-assets.json"))))
+            .Returns(true);
+        _mockFileSystem.Setup(f => f.ReadAllText(It.Is<string>(s => s.Contains(".copilot-assets.json"))))
+            .Returns(manifest.ToJson());
+
+        var options = new InitOptions { TargetDirectory = ".", Force = false };
+
+        // Act
+        var result = await _sut.PreviewInitAsync(options);
+
+        // Assert
+        result.Summary.Skips.Should().BeGreaterThan(0);
+        result.Summary.Creates.Should().Be(0);
+    }
 }

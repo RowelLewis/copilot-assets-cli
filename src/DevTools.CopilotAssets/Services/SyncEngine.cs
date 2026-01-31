@@ -37,7 +37,7 @@ public sealed class SyncEngine
     /// <summary>
     /// Sync all assets to the target directory.
     /// </summary>
-    public SyncResult SyncAssets(string targetDirectory, bool force = false)
+    public SyncResult SyncAssets(string targetDirectory, bool force = false, AssetTypeFilter? filter = null)
     {
         var result = new SyncResult();
         var templatesPath = GetTemplatesPath();
@@ -58,6 +58,14 @@ public sealed class SyncEngine
         foreach (var templateFile in templateFiles)
         {
             var relativePath = Path.GetRelativePath(templatesPath, templateFile);
+
+            // Apply filter if specified
+            if (filter != null && !filter.ShouldIncludePath(relativePath))
+            {
+                result.Skipped.Add(relativePath);
+                continue;
+            }
+
             var targetFile = _fileSystem.CombinePath(targetGitHubPath, relativePath);
 
             var exists = _fileSystem.Exists(targetFile);
@@ -163,30 +171,4 @@ public sealed class SyncEngine
         return _fileSystem.GetFiles(templatesPath, "*", recursive: true)
             .Select(f => Path.GetRelativePath(templatesPath, f));
     }
-}
-
-/// <summary>
-/// Result of a sync operation.
-/// </summary>
-public sealed class SyncResult
-{
-    public List<SyncedAsset> Synced { get; } = [];
-    public List<string> Unchanged { get; } = [];
-    public List<string> Skipped { get; } = [];
-    public List<string> Errors { get; } = [];
-    public List<string> Warnings { get; } = [];
-
-    public bool Success => Errors.Count == 0;
-    public int TotalProcessed => Synced.Count + Unchanged.Count + Skipped.Count;
-}
-
-/// <summary>
-/// Information about a synced asset.
-/// </summary>
-public sealed class SyncedAsset
-{
-    public required string RelativePath { get; init; }
-    public required string FullPath { get; init; }
-    public required string Checksum { get; init; }
-    public bool WasUpdated { get; init; }
 }
