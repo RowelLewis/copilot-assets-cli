@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DevTools.CopilotAssets</RootNamespace>
+    <AssemblyName>copilot-assets</AssemblyName>
+
+    <!-- NuGet Tool Package Configuration -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>copilot-assets</ToolCommandName>
+    <PackageId>devtools.copilot-assets</PackageId>
+    <Version>1.0.0</Version>
+    <Description>GitHub Copilot Asset Distribution Tool - Install and sync Copilot prompts, agents, instructions, and skills</Description>
+    <PackageProjectUrl>https://github.com/org/copilot-assets-cli</PackageProjectUrl>
+    <PackageTags>copilot;github;devtools;cli</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <PackageReference Include="LibGit2Sharp" Version="0.30.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+  </ItemGroup>
+
+  <!-- Embed templates as content -->
+  <ItemGroup>
+    <None Include="..\..\templates\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="templates" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>

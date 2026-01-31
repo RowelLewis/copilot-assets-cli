@@ -1,0 +1,127 @@
+# Azure DevOps Pipeline - Copilot Assets CLI
+# Build, test, and publish the NuGet tool package
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - 'copilot-assets-cli/**'
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  buildConfiguration: 'Release'
+  projectPath: 'copilot-assets-cli/src/DevTools.CopilotAssets/DevTools.CopilotAssets.csproj'
+  testProjectPath: 'copilot-assets-cli/tests/DevTools.CopilotAssets.Tests/DevTools.CopilotAssets.Tests.csproj'
+  solutionPath: 'copilot-assets-cli/CopilotAssetsCli.sln'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # Code coverage thresholds
+  lineCoverageThreshold: 70
+  branchCoverageThreshold: 60
+
+stages:
+  - stage: Build
+    displayName: 'Build & Test'
+    jobs:
+      - job: BuildJob
+        displayName: 'Build'
+        steps:
+          - task: UseDotNet@2
+            displayName: 'Install .NET 10 SDK'
+            inputs:
+              packageType: sdk
+              version: '10.x'
+
+          - script: dotnet restore $(solutionPath)
+            displayName: 'Restore packages'
+
+          - script: dotnet build $(solutionPath) --configuration $(buildConfiguration) --no-restore
+            displayName: 'Build solution'
+
+          - script: |
+              dotnet test $(testProjectPath) \
+                --configuration $(buildConfiguration) \
+                --no-build \
+                --logger "trx;LogFileName=test-results.trx" \
+                --results-directory $(Build.ArtifactStagingDirectory)/TestResults \
+                --collect:"XPlat Code Coverage" \
+                -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+            displayName: 'Run tests with coverage'
+
+          - task: PublishTestResults@2
+            displayName: 'Publish test results'
+            inputs:
+              testResultsFormat: 'VSTest'
+              testResultsFiles: '$(Build.ArtifactStagingDirectory)/TestResults/*.trx'
+              mergeTestResults: true
+              failTaskOnFailedTests: true
+            condition: always()
+
+          - task: PublishCodeCoverageResults@2
+            displayName: 'Publish code coverage'
+            inputs:
+              summaryFileLocation: '$(Build.ArtifactStagingDirectory)/TestResults/**/coverage.cobertura.xml'
+              failIfCoverageEmpty: true
+            condition: always()
+
+          - script: |
+              # Install reportgenerator
+              dotnet tool install --global dotnet-reportgenerator-globaltool
+
+              # Generate detailed HTML report
+              reportgenerator \
+                -reports:$(Build.ArtifactStagingDirectory)/TestResults/**/coverage.cobertura.xml \
+                -targetdir:$(Build.ArtifactStagingDirectory)/CoverageReport \
+                -reporttypes:HtmlInline_AzurePipelines
+            displayName: 'Generate coverage report'
+            condition: always()
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish coverage report'
+            inputs:
+              pathToPublish: '$(Build.ArtifactStagingDirectory)/CoverageReport'
+              artifactName: 'coverage-report'
+            condition: always()
+
+          - script: dotnet pack $(projectPath) --configuration $(buildConfiguration) --no-build --output $(Build.ArtifactStagingDirectory)/packages
+            displayName: 'Create NuGet package'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish NuGet artifact'
+            inputs:
+              pathToPublish: '$(Build.ArtifactStagingDirectory)/packages'
+              artifactName: 'nuget-package'
+
+  - stage: Publish
+    displayName: 'Publish to Feed'
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: PublishJob
+        displayName: 'Publish NuGet Package'
+        steps:
+          - task: DownloadBuildArtifacts@1
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'nuget-package'
+              downloadPath: '$(System.ArtifactsDirectory)'
+
+          - task: NuGetCommand@2
+            displayName: 'Push to private feed'
+            inputs:
+              command: 'push'
+              packagesToPush: '$(System.ArtifactsDirectory)/nuget-package/*.nupkg'
+              nuGetFeedType: 'internal'
+              publishVstsFeed: 'devtools'  # Update with your feed name

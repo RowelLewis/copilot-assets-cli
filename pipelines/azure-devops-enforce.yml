@@ -1,0 +1,40 @@
+# Azure DevOps Pipeline - Copilot Assets Enforcement
+# Template for consumer repos to enforce Copilot asset compliance
+#
+# Usage: Copy this file to your repo's pipelines/ directory and configure the trigger
+
+trigger:
+  - main
+  - develop
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+steps:
+  - task: UseDotNet@2
+    displayName: 'Install .NET 10 SDK'
+    inputs:
+      packageType: sdk
+      version: '10.x'
+
+  # Configure private NuGet feed (update with your feed URL)
+  - script: |
+      dotnet nuget add source \
+        --name devtools-feed \
+        --username $(NUGET_USER) \
+        --password $(NUGET_TOKEN) \
+        --store-password-in-clear-text \
+        https://pkgs.dev.azure.com/org/project/_packaging/devtools/nuget/v3/index.json
+    displayName: 'Configure Private NuGet Feed'
+
+  # Install the Copilot Assets CLI
+  - script: dotnet tool install -g devtools.copilot-assets
+    displayName: 'Install Copilot Assets CLI'
+
+  # Validate compliance
+  - script: copilot-assets validate --ci
+    displayName: 'Enforce Copilot Asset Compliance'

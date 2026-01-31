@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>DevTools Team</Authors>
+    <Company>DevTools</Company>
+    <Copyright>Copyright © 2026 DevTools Team</Copyright>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,50 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/CopilotAssetsCli.sln",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "pack",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "pack",
+                "${workspaceFolder}/src/DevTools.CopilotAssets/DevTools.CopilotAssets.csproj",
+                "-o",
+                "${workspaceFolder}/artifacts"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "install-local",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "tool",
+                "install",
+                "--global",
+                "--add-source",
+                "${workspaceFolder}/artifacts",
+                "devtools.copilot-assets",
+                "--version",
+                "*-*"
+            ],
+            "problemMatcher": [],
+            "dependsOn": "pack"
+        }
+    ]
+}
