@@ -10,12 +10,11 @@ public class PolicyDefinitionTests
         // Arrange & Act
         var policy = new PolicyDefinition
         {
-            MinimumVersion = "1.0.0"
+            RequiredFiles = ["copilot-instructions.md"]
         };
 
         // Assert
-        policy.MinimumVersion.Should().Be("1.0.0");
-        policy.RequiredFiles.Should().BeEmpty();
+        policy.RequiredFiles.Should().HaveCount(1);
         policy.RestrictedPatterns.Should().BeEmpty();
         policy.EnforceInCi.Should().BeTrue();
     }
@@ -26,14 +25,12 @@ public class PolicyDefinitionTests
         // Arrange & Act
         var policy = new PolicyDefinition
         {
-            MinimumVersion = "2.0.0",
             RequiredFiles = ["copilot-instructions.md", "prompts/review.md"],
             RestrictedPatterns = [@"api[_-]?key", @"password\s*="],
             EnforceInCi = false
         };
 
         // Assert
-        policy.MinimumVersion.Should().Be("2.0.0");
         policy.RequiredFiles.Should().HaveCount(2);
         policy.RequiredFiles.Should().Contain("copilot-instructions.md");
         policy.RestrictedPatterns.Should().HaveCount(2);
@@ -46,13 +43,13 @@ public class PolicyDefinitionTests
         // Arrange
         var policy1 = new PolicyDefinition
         {
-            MinimumVersion = "1.0.0",
+            RequiredFiles = ["copilot-instructions.md"],
             EnforceInCi = true
         };
 
         var policy2 = new PolicyDefinition
         {
-            MinimumVersion = "1.0.0",
+            RequiredFiles = ["copilot-instructions.md"],
             EnforceInCi = true
         };
 

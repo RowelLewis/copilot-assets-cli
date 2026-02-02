@@ -14,7 +14,6 @@ public sealed class ValidationEngine
     // Default policy - can be overridden via policy.json in future
     private static readonly PolicyDefinition DefaultPolicy = new()
     {
-        MinimumVersion = "1.0.0",
         RequiredFiles =
         [
             "copilot-instructions.md"
@@ -57,12 +56,6 @@ public sealed class ValidationEngine
         {
             result.Errors.Add($"Missing manifest file ({Manifest.RelativePath}). Run 'copilot-assets init' to install assets.");
             return result;
-        }
-
-        // Version check
-        if (!IsVersionSatisfied(manifest.Version, DefaultPolicy.MinimumVersion))
-        {
-            result.Errors.Add($"Asset version {manifest.Version} is below minimum required {DefaultPolicy.MinimumVersion}. Run 'copilot-assets update'.");
         }
 
         // Required files check
@@ -121,22 +114,9 @@ public sealed class ValidationEngine
 
         if (result.IsCompliant)
         {
-            result.Info.Add($"✓ All validations passed (version {manifest.Version})");
+            result.Info.Add("✓ All validations passed");
         }
 
         return result;
-    }
-
-    /// <summary>
-    /// Compare semantic versions.
-    /// </summary>
-    private static bool IsVersionSatisfied(string installed, string minimum)
-    {
-        if (Version.TryParse(installed, out var installedVer) &&
-            Version.TryParse(minimum, out var minimumVer))
-        {
-            return installedVer >= minimumVer;
-        }
-        return true; // If parsing fails, assume satisfied
     }
 }

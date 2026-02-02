@@ -94,9 +94,9 @@ public class EndToEndTests : IDisposable
         };
         var updateResult = await _appService.UpdateAsync(updateOptions);
 
-        // Assert 3 - Update should succeed with info message
+        // Assert 3 - Update should succeed with info message about no changes
         updateResult.IsCompliant.Should().BeTrue();
-        updateResult.Info.Should().Contain(i => i.Contains("latest"));
+        updateResult.Info.Should().Contain(i => i.Contains("No changes") || i.Contains("unchanged"));
     }
 
     [Fact]

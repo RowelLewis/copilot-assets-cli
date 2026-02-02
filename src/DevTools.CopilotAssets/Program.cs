@@ -1,7 +1,10 @@
 using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
 using DevTools.CopilotAssets.Commands;
+using DevTools.CopilotAssets.Domain.Configuration;
 using DevTools.CopilotAssets.Services;
+using DevTools.CopilotAssets.Services.Http;
+using DevTools.CopilotAssets.Services.Templates;
 
 namespace DevTools.CopilotAssets;
 
@@ -33,8 +36,19 @@ public static class Program
         services.AddSingleton<IFileSystemService, FileSystemService>();
         services.AddSingleton<IGitService, GitService>();
 
-        // Application services
-        services.AddSingleton<SyncEngine>();
+        // Configuration
+        services.AddSingleton(_ => RemoteConfig.Load());
+
+        // Template providers and factory
+        services.AddSingleton<GitHubClient>();
+        services.AddSingleton<BundledTemplateProvider>();
+        services.AddSingleton<TemplateProviderFactory>();
+
+        // Application services - use factory for dynamic source selection
+        services.AddSingleton<SyncEngine>(sp => new SyncEngine(
+            sp.GetRequiredService<IFileSystemService>(),
+            sp.GetRequiredService<IGitService>(),
+            sp.GetRequiredService<TemplateProviderFactory>()));
         services.AddSingleton<ValidationEngine>();
         services.AddSingleton<IPolicyAppService, PolicyAppService>();
 
@@ -48,14 +62,25 @@ public static class Program
     {
         var policyService = services.GetRequiredService<IPolicyAppService>();
 
+        // Global --json option
+        var jsonOption = new Option<bool>(
+            "--json",
+            "Output results as JSON");
+
         var rootCommand = new RootCommand("Copilot Assets CLI - GitHub Copilot Asset Distribution Tool")
         {
-            InitCommand.Create(policyService),
-            UpdateCommand.Create(policyService),
-            ValidateCommand.Create(policyService),
-            DoctorCommand.Create(policyService),
-            VersionCommand.Create()
+            InitCommand.Create(policyService, jsonOption),
+            UpdateCommand.Create(policyService, jsonOption),
+            ValidateCommand.Create(policyService, jsonOption),
+            ListCommand.Create(policyService, jsonOption),
+            VerifyCommand.Create(policyService, jsonOption),
+            DoctorCommand.Create(policyService, jsonOption),
+            ConfigCommand.Create(jsonOption),
+            VersionCommand.Create(jsonOption)
         };
+
+        // Add global option
+        rootCommand.AddGlobalOption(jsonOption);
 
         return rootCommand;
     }
