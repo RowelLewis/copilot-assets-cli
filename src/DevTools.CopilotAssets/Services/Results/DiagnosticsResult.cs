@@ -1,3 +1,5 @@
+using DevTools.CopilotAssets.Domain;
+
 namespace DevTools.CopilotAssets.Services;
 
 /// <summary>
@@ -9,7 +11,7 @@ public sealed class DiagnosticsResult
     public bool IsGitRepository { get; init; }
     public bool AssetsDirectoryExists { get; init; }
     public bool ManifestExists { get; init; }
-    public string? InstalledVersion { get; init; }
+    public TemplateSource? Source { get; init; }
     public string ToolVersion { get; init; } = "1.0.0";
     public List<string> Issues { get; } = [];
 

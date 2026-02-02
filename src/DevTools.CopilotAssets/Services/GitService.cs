@@ -89,6 +89,14 @@ public sealed class GitService : IGitService
 
         using var repo = new Repository(repoRoot);
 
+        // Check if there are any changes to commit
+        var status = repo.RetrieveStatus();
+        if (!status.Any(s => s.State != FileStatus.Ignored && s.State != FileStatus.Unaltered))
+        {
+            // No changes to commit - this is fine, just return
+            return;
+        }
+
         // Get or create signature
         var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
         if (signature == null)
@@ -96,7 +104,15 @@ public sealed class GitService : IGitService
             signature = new Signature("Copilot Assets CLI", "copilot-assets@local", DateTimeOffset.Now);
         }
 
-        repo.Commit(message, signature, signature);
+        try
+        {
+            repo.Commit(message, signature, signature);
+        }
+        catch (EmptyCommitException)
+        {
+            // No changes to commit - this is fine, just return
+            return;
+        }
     }
 
     public void EnsureGitignoreIgnoresCopilotAssets(string repoPath)

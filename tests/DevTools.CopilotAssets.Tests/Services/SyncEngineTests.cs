@@ -6,17 +6,6 @@ namespace DevTools.CopilotAssets.Tests.Services;
 public class SyncEngineTests
 {
     [Fact]
-    public void AssetVersion_ShouldReturnVersion()
-    {
-        // Act
-        var version = SyncEngine.AssetVersion;
-
-        // Assert
-        version.Should().NotBeNullOrEmpty();
-        version.Should().MatchRegex(@"^\d+\.\d+\.\d+");
-    }
-
-    [Fact]
     public void ToolVersion_ShouldReturnVersion()
     {
         // Act
@@ -71,9 +60,10 @@ public class SyncEngineTests
 
         var manifestJson = """
         {
-            "version": "1.0.0",
+            "schemaVersion": 2,
             "installedAt": "2026-01-31T12:00:00Z",
             "toolVersion": "1.0.0.0",
+            "source": { "type": "bundled" },
             "assets": [],
             "checksums": {}
         }
@@ -89,7 +79,7 @@ public class SyncEngineTests
 
         // Assert
         result.Should().NotBeNull();
-        result!.Version.Should().Be("1.0.0");
+        result!.SchemaVersion.Should().Be(2);
     }
 
     [Fact]

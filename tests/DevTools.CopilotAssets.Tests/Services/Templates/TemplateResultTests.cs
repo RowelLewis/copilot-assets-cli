@@ -13,7 +13,6 @@ public class TemplateResultTests
         // Assert
         result.Templates.Should().BeEmpty();
         result.Source.Should().Be("test-source");
-        result.FromCache.Should().BeFalse();
         result.HasTemplates.Should().BeFalse();
         result.HasError.Should().BeFalse();
     }
@@ -42,7 +41,7 @@ public class TemplateResultTests
         };
 
         // Act
-        var result = new TemplateResult(templates, "source", false);
+        var result = new TemplateResult(templates, "source");
 
         // Assert
         result.HasTemplates.Should().BeTrue();
@@ -52,7 +51,7 @@ public class TemplateResultTests
     public void HasError_ShouldReturnTrue_WhenErrorIsSet()
     {
         // Arrange
-        var result = new TemplateResult([], "source", false)
+        var result = new TemplateResult([], "source")
         {
             Error = "Something went wrong"
         };

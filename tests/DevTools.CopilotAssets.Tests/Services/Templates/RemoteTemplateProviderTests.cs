@@ -32,14 +32,14 @@ public class RemoteTemplateProviderTests
             .Returns(new[] { Path.Combine(templatesPath, "test.md") });
         _mockFileSystem.Setup(fs => fs.ReadAllText(It.IsAny<string>())).Returns("content");
 
-        // Use a simple HttpClient that will fail - it should fall back to bundled
+        // Use a simple HttpClient that will fail - it should fall back to default
         var provider = new RemoteTemplateProvider(noRemoteConfig, _mockFileSystem.Object);
 
         // Act
         var result = await provider.GetTemplatesAsync();
 
         // Assert
-        result.Source.Should().Be("bundled");
+        result.Source.Should().Be("default");
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class RemoteTemplateProviderTests
         var result = await provider.GetTemplatesAsync();
 
         // Assert
-        result.Source.Should().Be("bundled");
+        result.Source.Should().Be("default");
     }
 
     [Fact]

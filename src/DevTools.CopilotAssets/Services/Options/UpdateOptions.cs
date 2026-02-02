@@ -26,4 +26,17 @@ public sealed record UpdateOptions
     /// Filter to apply when selecting assets.
     /// </summary>
     public AssetTypeFilter? Filter { get; init; }
+
+    /// <summary>
+    /// Template source override (e.g., "owner/repo[@branch]").
+    /// When set, overrides the configured remote source.
+    /// Null means use configured source or default.
+    /// </summary>
+    public string? SourceOverride { get; init; }
+
+    /// <summary>
+    /// When true, explicitly use default (bundled) templates
+    /// even if a remote source is configured.
+    /// </summary>
+    public bool UseDefaultTemplates { get; init; }
 }

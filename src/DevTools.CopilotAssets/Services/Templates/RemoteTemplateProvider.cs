@@ -5,7 +5,7 @@ namespace DevTools.CopilotAssets.Services.Templates;
 
 /// <summary>
 /// Provides templates from a remote GitHub repository.
-/// Falls back to cached templates if network is unavailable.
+/// Falls back to default templates if remote is unavailable.
 /// </summary>
 public sealed class RemoteTemplateProvider : ITemplateProvider, IDisposable
 {
@@ -28,7 +28,7 @@ public sealed class RemoteTemplateProvider : ITemplateProvider, IDisposable
     /// <inheritdoc />
     public async Task<TemplateResult> GetTemplatesAsync(CancellationToken ct = default)
     {
-        // If no remote configured, use bundled
+        // If no remote configured, use default templates
         if (!_config.HasRemoteSource || string.IsNullOrEmpty(_config.Source))
         {
             return await _fallbackProvider.GetTemplatesAsync(ct);
@@ -42,24 +42,12 @@ public sealed class RemoteTemplateProvider : ITemplateProvider, IDisposable
 
         if (result.HasTemplates)
         {
-            // Cache the templates locally
-            await CacheTemplatesAsync(result.Templates, ct);
             return result with { Source = source };
         }
 
-        // Try cached templates
-        var cached = await GetCachedTemplatesAsync(ct);
-        if (cached.HasTemplates)
-        {
-            return cached with { Source = $"cached:{_config.Source}@{_config.Branch}" };
-        }
-
-        // Fall back to bundled
-        var bundled = await _fallbackProvider.GetTemplatesAsync(ct);
-        return bundled with
-        {
-            Error = $"Remote unavailable ({result.Error}), using bundled templates"
-        };
+        // Remote failed - return error, don't silently fall back
+        // The caller should handle this and offer options to the user
+        return TemplateResult.Failed(source, result.Error ?? "Failed to fetch remote templates");
     }
 
     /// <inheritdoc />
@@ -106,78 +94,7 @@ public sealed class RemoteTemplateProvider : ITemplateProvider, IDisposable
             return TemplateResult.Failed($"remote:{owner}/{repo}@{branch}", "No template files found in .github directory");
         }
 
-        return new TemplateResult(templates, $"remote:{owner}/{repo}@{branch}", FromCache: false);
-    }
-
-    private async Task CacheTemplatesAsync(IReadOnlyList<TemplateFile> templates, CancellationToken ct)
-    {
-        var cacheDir = GetCacheDirectory();
-
-        // Clear existing cache
-        if (_fileSystem.Exists(cacheDir))
-        {
-            try
-            {
-                Directory.Delete(cacheDir, recursive: true);
-            }
-            catch
-            {
-                // Ignore cache cleanup errors
-            }
-        }
-
-        _fileSystem.CreateDirectory(cacheDir);
-
-        foreach (var template in templates)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            var targetPath = Path.Combine(cacheDir, template.RelativePath.Replace('/', Path.DirectorySeparatorChar));
-            var targetDir = Path.GetDirectoryName(targetPath);
-
-            if (!string.IsNullOrEmpty(targetDir))
-            {
-                _fileSystem.CreateDirectory(targetDir);
-            }
-
-            _fileSystem.WriteAllText(targetPath, template.Content);
-        }
-    }
-
-    private Task<TemplateResult> GetCachedTemplatesAsync(CancellationToken ct)
-    {
-        var cacheDir = GetCacheDirectory();
-
-        if (!_fileSystem.Exists(cacheDir))
-        {
-            return Task.FromResult(TemplateResult.Empty("cached"));
-        }
-
-        var templates = new List<TemplateFile>();
-        var files = _fileSystem.GetFiles(cacheDir, "*", recursive: true);
-
-        foreach (var file in files)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            var relativePath = Path.GetRelativePath(cacheDir, file)
-                .Replace(Path.DirectorySeparatorChar, '/');
-            var content = _fileSystem.ReadAllText(file);
-
-            templates.Add(new TemplateFile(relativePath, content));
-        }
-
-        return Task.FromResult(new TemplateResult(templates, "cached", FromCache: true));
-    }
-
-    private static string GetCacheDirectory()
-    {
-        return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".config",
-            "copilot-assets",
-            "cache",
-            ".github");
+        return new TemplateResult(templates, $"remote:{owner}/{repo}@{branch}");
     }
 
     private static (string Owner, string Repo) ParseSource(string source)

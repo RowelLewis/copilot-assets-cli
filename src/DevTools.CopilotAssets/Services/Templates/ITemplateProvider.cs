@@ -1,7 +1,7 @@
 namespace DevTools.CopilotAssets.Services.Templates;
 
 /// <summary>
-/// Provides template files from a source (bundled, remote, or cached).
+/// Provides template files from a source (default or remote).
 /// </summary>
 public interface ITemplateProvider
 {

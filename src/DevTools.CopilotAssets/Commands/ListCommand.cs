@@ -88,6 +88,19 @@ public sealed class ListCommand : BaseCommand
         }
 
         Console.WriteLine($"Installed Assets ({result.Summary.Total})");
+
+        // Show template source
+        if (result.Source != null)
+        {
+            var sourceDesc = result.Source.Type switch
+            {
+                "default" => "default templates",
+                "remote" => $"remote: {result.Source.Repo}@{result.Source.Branch}",
+                _ => result.Source.Type
+            };
+            Console.WriteLine($"Source: {sourceDesc}");
+        }
+
         Console.WriteLine();
         Console.WriteLine("Type          Name                      Status");
         Console.WriteLine("────────────────────────────────────────────────────");

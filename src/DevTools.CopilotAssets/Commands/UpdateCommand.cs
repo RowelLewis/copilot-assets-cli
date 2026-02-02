@@ -24,6 +24,14 @@ public sealed class UpdateCommand : BaseCommand
             "--dry-run",
             "Preview changes without making modifications");
 
+        var interactiveOption = new Option<bool>(
+            ["--interactive", "-i"],
+            "Review and select files individually or by folder");
+
+        var sourceOption = new Option<string?>(
+            ["--source", "-s"],
+            "Template source: 'default' or 'owner/repo[@branch]'");
+
         var onlyOption = new Option<string?>(
             "--only",
             "Update only specified asset types (comma-separated: instruction,prompts,agents,skills)");
@@ -42,6 +50,8 @@ public sealed class UpdateCommand : BaseCommand
             forceOption,
             noGitOption,
             dryRunOption,
+            interactiveOption,
+            sourceOption,
             onlyOption,
             excludeOption,
             pathArgument
@@ -52,6 +62,8 @@ public sealed class UpdateCommand : BaseCommand
             var force = ctx.ParseResult.GetValueForOption(forceOption);
             var noGit = ctx.ParseResult.GetValueForOption(noGitOption);
             var dryRun = ctx.ParseResult.GetValueForOption(dryRunOption);
+            var interactive = ctx.ParseResult.GetValueForOption(interactiveOption);
+            var source = ctx.ParseResult.GetValueForOption(sourceOption);
             var only = ctx.ParseResult.GetValueForOption(onlyOption);
             var exclude = ctx.ParseResult.GetValueForOption(excludeOption);
             var path = ctx.ParseResult.GetValueForArgument(pathArgument);
@@ -65,6 +77,19 @@ public sealed class UpdateCommand : BaseCommand
                     WriteJson("update", new { }, 1, ["Cannot use --only and --exclude together"]);
                 else
                     WriteError("Cannot use --only and --exclude together");
+                Environment.ExitCode = 1;
+                return;
+            }
+
+            // Handle source selection
+            var (sourceSelection, sourceError) = SourceSelector.GetSourceSelection(source, json);
+
+            if (sourceError != null)
+            {
+                if (json)
+                    WriteJson("update", new { }, 1, [sourceError]);
+                else
+                    WriteError(sourceError);
                 Environment.ExitCode = 1;
                 return;
             }
@@ -105,7 +130,9 @@ public sealed class UpdateCommand : BaseCommand
                 TargetDirectory = path,
                 Force = force,
                 NoGit = noGit,
-                Filter = filter
+                Filter = filter,
+                SourceOverride = sourceSelection.SourceOverride,
+                UseDefaultTemplates = sourceSelection.UseDefault
             };
 
             // Dry run mode
@@ -121,6 +148,24 @@ public sealed class UpdateCommand : BaseCommand
                     PrintDryRunResult(preview);
                 }
                 Environment.ExitCode = preview.ExitCode;
+                return;
+            }
+
+            // Interactive mode
+            if (interactive && !json)
+            {
+                var sourceOverride = sourceSelection.UseDefault ? "default" : sourceSelection.SourceOverride;
+                var interactiveResult = await RunInteractiveModeAsync(policyService, path, filter, sourceOverride, noGit);
+                if (interactiveResult != null)
+                {
+                    foreach (var error in interactiveResult.Errors)
+                        WriteError(error);
+                    foreach (var warning in interactiveResult.Warnings)
+                        WriteWarning(warning);
+                    foreach (var info in interactiveResult.Info)
+                        WriteInfo(info);
+                    Environment.ExitCode = interactiveResult.IsCompliant ? 0 : 1;
+                }
                 return;
             }
 
@@ -183,5 +228,50 @@ public sealed class UpdateCommand : BaseCommand
         }
 
         Console.WriteLine($"Summary: {result.Summary.Creates} creates, {result.Summary.Updates} updates");
+    }
+
+    private static async Task<ValidationResult?> RunInteractiveModeAsync(
+        IPolicyAppService policyService,
+        string targetDirectory,
+        AssetTypeFilter? filter,
+        string? sourceOverride,
+        bool noGit)
+    {
+        Console.WriteLine("Checking for updates...");
+
+        // Get pending operations
+        var (files, source, error) = await policyService.GetPendingOperationsAsync(
+            targetDirectory, filter, sourceOverride);
+
+        if (error != null)
+        {
+            WriteError(error);
+            return null;
+        }
+
+        // Filter to only new/modified files for update
+        var changedFiles = files.Where(f => f.Status != PendingFileStatus.Unchanged).ToList();
+
+        if (changedFiles.Count == 0)
+        {
+            WriteInfo("Everything is up to date.");
+            return new ValidationResult();
+        }
+
+        // Interactive file selection
+        var selectedFiles = InteractiveMenu.SelectFiles(
+            changedFiles, isUpdate: true, out var totalUpdated, out var totalSkipped);
+
+        Console.WriteLine();
+        Console.WriteLine($"Summary: {totalUpdated} to update, {totalSkipped} skipped");
+
+        if (selectedFiles.Count == 0)
+        {
+            WriteInfo("No files selected for update.");
+            return new ValidationResult();
+        }
+
+        // Execute selective sync
+        return policyService.ExecuteSelectiveSync(targetDirectory, selectedFiles, source, noGit);
     }
 }

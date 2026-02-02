@@ -8,4 +8,5 @@ namespace DevTools.CopilotAssets.Domain;
 public sealed record AssetListResult(
     [property: JsonPropertyName("projectPath")] string ProjectPath,
     [property: JsonPropertyName("assets")] IReadOnlyList<AssetInfo> Assets,
-    [property: JsonPropertyName("summary")] AssetSummary Summary);
+    [property: JsonPropertyName("summary")] AssetSummary Summary,
+    [property: JsonPropertyName("source")] TemplateSource? Source = null);

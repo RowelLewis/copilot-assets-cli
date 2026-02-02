@@ -36,8 +36,7 @@ public class BundledTemplateProviderTests
         // Assert
         result.HasTemplates.Should().BeTrue();
         result.Templates.Should().HaveCount(2);
-        result.Source.Should().Be("bundled");
-        result.FromCache.Should().BeFalse();
+        result.Source.Should().Be("default");
         result.Templates[0].RelativePath.Should().Be("copilot-instructions.md");
         result.Templates[1].RelativePath.Should().Be("agents/test.agent.md");
     }

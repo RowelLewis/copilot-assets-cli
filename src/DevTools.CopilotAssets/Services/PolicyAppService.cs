@@ -34,12 +34,19 @@ public sealed class PolicyAppService : IPolicyAppService
         var existingManifest = _syncEngine.ReadManifest(targetDir);
         if (existingManifest != null && !options.Force)
         {
-            result.Warnings.Add($"Assets already installed (version {existingManifest.Version}). Use --force to reinstall.");
+            result.Warnings.Add("Assets already installed. Use --force to reinstall.");
             return result;
         }
 
-        // Sync assets with optional filter
-        var syncResult = await _syncEngine.SyncAssetsAsync(targetDir, options.Force, options.Filter);
+        // Determine source override
+        string? sourceOverride = options.UseDefaultTemplates ? "default" : options.SourceOverride;
+
+        // Sync assets with optional filter and source
+        var syncResult = await _syncEngine.SyncAssetsAsync(
+            targetDir,
+            options.Force,
+            options.Filter,
+            sourceOverride);
 
         if (!syncResult.Success)
         {
@@ -71,7 +78,7 @@ public sealed class PolicyAppService : IPolicyAppService
             if (PromptUserForCommit(syncResult.Synced.Count))
             {
                 _git.Stage(targetDir, filesToStage.ToArray());
-                _git.Commit(targetDir, $"chore: install copilot assets v{SyncEngine.AssetVersion}");
+                _git.Commit(targetDir, "chore: install copilot assets");
                 result.Info.Add("Changes committed to git");
             }
             else
@@ -100,15 +107,33 @@ public sealed class PolicyAppService : IPolicyAppService
             return result;
         }
 
-        // Check if update is needed
-        if (existingManifest.Version == SyncEngine.AssetVersion && !options.Force)
+        // Determine source override
+        string? sourceOverride = options.UseDefaultTemplates ? "default" : options.SourceOverride;
+
+        // Check for updates using checksums (not fake version numbers)
+        if (!options.Force)
         {
-            result.Info.Add($"Assets are already at latest version ({SyncEngine.AssetVersion})");
-            return result;
+            var updateCheck = await _syncEngine.CheckForUpdatesAsync(targetDir, options.Filter, sourceOverride);
+
+            if (!updateCheck.HasChanges)
+            {
+                var totalFiles = updateCheck.Unchanged.Count;
+                result.Info.Add($"✓ No changes detected (all {totalFiles} files match)");
+                return result;
+            }
+
+            // Show what would change
+            result.Info.Add("Changes available:");
+            foreach (var file in updateCheck.Modified)
+                result.Info.Add($"  Modified: {file}");
+            foreach (var file in updateCheck.Added)
+                result.Info.Add($"  Added: {file}");
+            foreach (var file in updateCheck.Removed)
+                result.Info.Add($"  Removed: {file}");
         }
 
         // Sync with force to update
-        var syncResult = await _syncEngine.SyncAssetsAsync(targetDir, force: true, options.Filter);
+        var syncResult = await _syncEngine.SyncAssetsAsync(targetDir, force: true, options.Filter, sourceOverride);
 
         if (!syncResult.Success)
         {
@@ -139,7 +164,7 @@ public sealed class PolicyAppService : IPolicyAppService
             if (PromptUserForCommit(syncResult.Synced.Count))
             {
                 _git.Stage(targetDir, filesToStage.ToArray());
-                _git.Commit(targetDir, $"chore: update copilot assets to v{SyncEngine.AssetVersion}");
+                _git.Commit(targetDir, "chore: update copilot assets");
                 result.Info.Add("Changes committed to git");
             }
             else
@@ -179,7 +204,7 @@ public sealed class PolicyAppService : IPolicyAppService
             ToolVersion = SyncEngine.ToolVersion,
             AssetsDirectoryExists = _fileSystem.Exists(gitHubPath),
             ManifestExists = manifest != null,
-            InstalledVersion = manifest?.Version
+            Source = manifest?.Source
         };
 
         // Check for issues
@@ -213,7 +238,8 @@ public sealed class PolicyAppService : IPolicyAppService
             return new AssetListResult(
                 ProjectPath: targetDir,
                 Assets: [],
-                Summary: new AssetSummary(0, 0, 0, 0));
+                Summary: new AssetSummary(0, 0, 0, 0),
+                Source: null);
         }
 
         var assets = new List<AssetInfo>();
@@ -266,7 +292,8 @@ public sealed class PolicyAppService : IPolicyAppService
         return await Task.FromResult(new AssetListResult(
             ProjectPath: targetDir,
             Assets: assets,
-            Summary: new AssetSummary(assets.Count, valid, modified, missing)));
+            Summary: new AssetSummary(assets.Count, valid, modified, missing),
+            Source: manifest.Source));
     }
 
     /// <inheritdoc />
@@ -502,13 +529,23 @@ public sealed class PolicyAppService : IPolicyAppService
             return await Task.FromResult(DryRunResult.FromOperations(operations));
         }
 
-        // Check if update is needed
-        if (existingManifest.Version == SyncEngine.AssetVersion && !options.Force)
+        // Check for updates using checksum comparison
+        var updateCheck = await _syncEngine.CheckForUpdatesAsync(targetDir);
+        if (updateCheck.NotInstalled)
         {
             operations.Add(new PlannedOperation(
                 OperationType.Skip,
                 ".",
-                $"Already at latest version ({SyncEngine.AssetVersion})"));
+                "Assets not installed. Run 'copilot-assets init' first."));
+            return await Task.FromResult(DryRunResult.FromOperations(operations));
+        }
+
+        if (!updateCheck.HasChanges && !options.Force)
+        {
+            operations.Add(new PlannedOperation(
+                OperationType.Skip,
+                ".",
+                "Templates unchanged. Use --force to reinstall."));
             return await Task.FromResult(DryRunResult.FromOperations(operations));
         }
 
@@ -536,5 +573,81 @@ public sealed class PolicyAppService : IPolicyAppService
 
         // Default to Yes if user just presses Enter
         return string.IsNullOrEmpty(response) || response == "y" || response == "yes";
+    }
+
+    /// <inheritdoc />
+    public Task<(List<PendingFile> Files, string? Source, string? Error)> GetPendingOperationsAsync(
+        string targetDirectory,
+        AssetTypeFilter? filter = null,
+        string? sourceOverride = null,
+        CancellationToken ct = default)
+    {
+        var targetDir = _fileSystem.GetFullPath(targetDirectory);
+        return _syncEngine.GetPendingOperationsAsync(targetDir, filter, sourceOverride, ct);
+    }
+
+    /// <inheritdoc />
+    public ValidationResult ExecuteSelectiveSync(
+        string targetDirectory,
+        IEnumerable<PendingFile> selectedFiles,
+        string? source = null,
+        bool noGit = false)
+    {
+        var result = new ValidationResult();
+        var targetDir = _fileSystem.GetFullPath(targetDirectory);
+        var filesList = selectedFiles.ToList();
+
+        if (filesList.Count == 0)
+        {
+            result.Info.Add("No files selected for installation.");
+            return result;
+        }
+
+        // Execute selective sync
+        var syncResult = _syncEngine.ExecuteSelective(targetDir, filesList, source);
+
+        if (!syncResult.Success)
+        {
+            result.Errors.AddRange(syncResult.Errors);
+            return result;
+        }
+
+        // Update .gitignore to ensure Copilot assets are ignored
+        if (!noGit && _git.IsRepository(targetDir))
+        {
+            _git.EnsureGitignoreIgnoresCopilotAssets(targetDir);
+        }
+
+        // Git operations
+        if (!noGit && _git.IsRepository(targetDir))
+        {
+            var filesToStage = syncResult.Synced
+                .Select(s => s.FullPath)
+                .ToList();
+
+            // Also stage .gitignore if it was modified
+            var gitignorePath = _fileSystem.CombinePath(targetDir, ".gitignore");
+            if (_fileSystem.Exists(gitignorePath))
+            {
+                filesToStage.Add(gitignorePath);
+            }
+
+            // Prompt user for confirmation
+            if (PromptUserForCommit(syncResult.Synced.Count))
+            {
+                _git.Stage(targetDir, filesToStage.ToArray());
+                _git.Commit(targetDir, "chore: install copilot assets");
+                result.Info.Add("Changes committed to git");
+            }
+            else
+            {
+                result.Info.Add("Changes not committed. Files are ready to be staged.");
+            }
+        }
+
+        result.Info.Add($"✓ Installed {syncResult.Synced.Count} asset(s)");
+        result.Warnings.AddRange(syncResult.Warnings);
+
+        return result;
     }
 }

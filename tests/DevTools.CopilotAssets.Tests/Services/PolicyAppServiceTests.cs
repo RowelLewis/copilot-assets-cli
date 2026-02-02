@@ -25,16 +25,13 @@ public class PolicyAppServiceTests
             validationEngine);
     }
 
+    private static Manifest CreateTestManifest() => Manifest.Create("1.0.0");
+
     [Fact]
     public async Task InitAsync_WhenAlreadyInitialized_AndNoForce_ShouldReturnWarning()
     {
         // Arrange
-        var manifest = new Manifest
-        {
-            Version = "1.0.0",
-            ToolVersion = "1.0.0",
-            InstalledAt = DateTime.UtcNow
-        };
+        var manifest = CreateTestManifest();
 
         _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
         _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
@@ -57,12 +54,7 @@ public class PolicyAppServiceTests
     public async Task InitAsync_WhenAlreadyInitialized_WithForce_ShouldReinstall()
     {
         // Arrange
-        var manifest = new Manifest
-        {
-            Version = "1.0.0",
-            ToolVersion = "1.0.0",
-            InstalledAt = DateTime.UtcNow
-        };
+        var manifest = CreateTestManifest();
 
         _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
         _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
@@ -145,32 +137,8 @@ public class PolicyAppServiceTests
         result.Errors.Should().Contain(e => e.Contains("not installed"));
     }
 
-    [Fact]
-    public async Task UpdateAsync_WhenAlreadyLatest_ShouldReturnInfo()
-    {
-        // Arrange
-        var manifest = new Manifest
-        {
-            Version = SyncEngine.AssetVersion, // Same as current
-            ToolVersion = "1.0.0",
-            InstalledAt = DateTime.UtcNow
-        };
-
-        _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
-        _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
-            .Returns<string[]>(paths => string.Join("/", paths));
-        _mockFileSystem.Setup(f => f.Exists(It.IsAny<string>())).Returns(true);
-        _mockFileSystem.Setup(f => f.ReadAllText(It.Is<string>(s => s.Contains(".copilot-assets.json"))))
-            .Returns(manifest.ToJson());
-
-        var options = new UpdateOptions { TargetDirectory = ".", Force = false };
-
-        // Act
-        var result = await _sut.UpdateAsync(options);
-
-        // Assert
-        result.Info.Should().Contain(i => i.Contains("already at latest"));
-    }
+    // Note: UpdateAsync with unchanged templates is tested in EndToEndTests
+    // because it requires proper file system interactions that are difficult to mock
 
     [Fact]
     public async Task ValidateAsync_ShouldDelegateToValidationEngine()
@@ -254,17 +222,10 @@ public class PolicyAppServiceTests
     public async Task ListAssetsAsync_WithManifest_ShouldReturnAssets()
     {
         // Arrange
-        var manifest = new Manifest
-        {
-            Version = "1.0.0",
-            ToolVersion = "1.0.0",
-            InstalledAt = DateTime.UtcNow,
-            Assets = ["prompts/test.md", ".copilot-assets.json"],
-            Checksums = new Dictionary<string, string>
-            {
-                ["prompts/test.md"] = "checksum123"
-            }
-        };
+        var manifest = CreateTestManifest();
+        manifest.Assets.Add("prompts/test.md");
+        manifest.Assets.Add(".copilot-assets.json");
+        manifest.Checksums["prompts/test.md"] = "checksum123";
 
         _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
         _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
@@ -294,18 +255,12 @@ public class PolicyAppServiceTests
     public async Task ListAssetsAsync_WithFilter_ShouldFilterResults()
     {
         // Arrange
-        var manifest = new Manifest
-        {
-            Version = "1.0.0",
-            ToolVersion = "1.0.0",
-            InstalledAt = DateTime.UtcNow,
-            Assets = ["prompts/test.md", "agents/agent.md", ".copilot-assets.json"],
-            Checksums = new Dictionary<string, string>
-            {
-                ["prompts/test.md"] = "checksum1",
-                ["agents/agent.md"] = "checksum2"
-            }
-        };
+        var manifest = CreateTestManifest();
+        manifest.Assets.Add("prompts/test.md");
+        manifest.Assets.Add("agents/agent.md");
+        manifest.Assets.Add(".copilot-assets.json");
+        manifest.Checksums["prompts/test.md"] = "checksum1";
+        manifest.Checksums["agents/agent.md"] = "checksum2";
 
         _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
         _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
@@ -349,17 +304,10 @@ public class PolicyAppServiceTests
     public async Task VerifyAsync_WithValidAssets_ShouldReturnZeroExitCode()
     {
         // Arrange
-        var manifest = new Manifest
-        {
-            Version = "1.0.0",
-            ToolVersion = "1.0.0",
-            InstalledAt = DateTime.UtcNow,
-            Assets = ["prompts/test.md", ".copilot-assets.json"],
-            Checksums = new Dictionary<string, string>
-            {
-                ["prompts/test.md"] = "checksum123"
-            }
-        };
+        var manifest = CreateTestManifest();
+        manifest.Assets.Add("prompts/test.md");
+        manifest.Assets.Add(".copilot-assets.json");
+        manifest.Checksums["prompts/test.md"] = "checksum123";
 
         _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
         _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
@@ -385,17 +333,10 @@ public class PolicyAppServiceTests
     public async Task VerifyAsync_WithModifiedAsset_ShouldReturnOneExitCode()
     {
         // Arrange
-        var manifest = new Manifest
-        {
-            Version = "1.0.0",
-            ToolVersion = "1.0.0",
-            InstalledAt = DateTime.UtcNow,
-            Assets = ["prompts/test.md", ".copilot-assets.json"],
-            Checksums = new Dictionary<string, string>
-            {
-                ["prompts/test.md"] = "original-checksum"
-            }
-        };
+        var manifest = CreateTestManifest();
+        manifest.Assets.Add("prompts/test.md");
+        manifest.Assets.Add(".copilot-assets.json");
+        manifest.Checksums["prompts/test.md"] = "original-checksum";
 
         _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
         _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
@@ -442,12 +383,7 @@ public class PolicyAppServiceTests
     public async Task PreviewInitAsync_WhenAlreadyInitialized_WithoutForce_ShouldShowSkip()
     {
         // Arrange
-        var manifest = new Manifest
-        {
-            Version = "1.0.0",
-            ToolVersion = "1.0.0",
-            InstalledAt = DateTime.UtcNow
-        };
+        var manifest = CreateTestManifest();
 
         _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
         _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))

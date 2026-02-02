@@ -46,4 +46,22 @@ public interface IPolicyAppService
     /// Preview what update would do without modifying anything.
     /// </summary>
     Task<DryRunResult> PreviewUpdateAsync(UpdateOptions options);
+
+    /// <summary>
+    /// Get pending file operations for interactive mode.
+    /// </summary>
+    Task<(List<PendingFile> Files, string? Source, string? Error)> GetPendingOperationsAsync(
+        string targetDirectory,
+        AssetTypeFilter? filter = null,
+        string? sourceOverride = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Execute sync for selected files only (interactive mode).
+    /// </summary>
+    ValidationResult ExecuteSelectiveSync(
+        string targetDirectory,
+        IEnumerable<PendingFile> selectedFiles,
+        string? source = null,
+        bool noGit = false);
 }

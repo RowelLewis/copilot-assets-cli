@@ -3,8 +3,8 @@ using System.Reflection;
 namespace DevTools.CopilotAssets.Services.Templates;
 
 /// <summary>
-/// Provides templates bundled with the CLI tool.
-/// This is the default provider and fallback when remote is unavailable.
+/// Provides default templates bundled with the CLI tool.
+/// This is the default provider when no remote source is configured.
 /// </summary>
 public sealed class BundledTemplateProvider : ITemplateProvider
 {
@@ -22,7 +22,7 @@ public sealed class BundledTemplateProvider : ITemplateProvider
 
         if (!_fileSystem.Exists(templatesPath))
         {
-            return Task.FromResult(TemplateResult.Failed("bundled", $"Templates directory not found: {templatesPath}"));
+            return Task.FromResult(TemplateResult.Failed("default", $"Templates directory not found: {templatesPath}"));
         }
 
         var templates = new List<TemplateFile>();
@@ -39,7 +39,7 @@ public sealed class BundledTemplateProvider : ITemplateProvider
             templates.Add(new TemplateFile(relativePath, content));
         }
 
-        return Task.FromResult(new TemplateResult(templates, "bundled", FromCache: false));
+        return Task.FromResult(new TemplateResult(templates, "default"));
     }
 
     /// <inheritdoc />

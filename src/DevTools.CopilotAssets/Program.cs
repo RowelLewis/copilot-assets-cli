@@ -39,28 +39,16 @@ public static class Program
         // Configuration
         services.AddSingleton(_ => RemoteConfig.Load());
 
-        // Template providers
+        // Template providers and factory
         services.AddSingleton<GitHubClient>();
         services.AddSingleton<BundledTemplateProvider>();
-        services.AddSingleton<ITemplateProvider>(sp =>
-        {
-            var config = sp.GetRequiredService<RemoteConfig>();
-            var fileSystem = sp.GetRequiredService<IFileSystemService>();
-            var gitHubClient = sp.GetRequiredService<GitHubClient>();
+        services.AddSingleton<TemplateProviderFactory>();
 
-            // Use remote provider if configured, otherwise bundled
-            if (config.HasRemoteSource)
-            {
-                return new RemoteTemplateProvider(config, fileSystem, gitHubClient);
-            }
-            return sp.GetRequiredService<BundledTemplateProvider>();
-        });
-
-        // Application services
+        // Application services - use factory for dynamic source selection
         services.AddSingleton<SyncEngine>(sp => new SyncEngine(
             sp.GetRequiredService<IFileSystemService>(),
             sp.GetRequiredService<IGitService>(),
-            sp.GetRequiredService<ITemplateProvider>()));
+            sp.GetRequiredService<TemplateProviderFactory>()));
         services.AddSingleton<ValidationEngine>();
         services.AddSingleton<IPolicyAppService, PolicyAppService>();
 

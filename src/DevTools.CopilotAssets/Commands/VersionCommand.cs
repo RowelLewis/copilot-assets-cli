@@ -23,14 +23,12 @@ public sealed class VersionCommand : BaseCommand
                 WriteJson("version", new
                 {
                     tool = "copilot-assets",
-                    version = SyncEngine.ToolVersion,
-                    assetVersion = SyncEngine.AssetVersion
+                    version = SyncEngine.ToolVersion
                 });
             }
             else
             {
                 Console.WriteLine($"copilot-assets {SyncEngine.ToolVersion}");
-                Console.WriteLine($"Asset version: {SyncEngine.AssetVersion}");
             }
         });
 

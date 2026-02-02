@@ -31,7 +31,7 @@ public sealed class DoctorCommand : BaseCommand
                         isGitRepository = result.IsGitRepository,
                         assetsDirectoryExists = result.AssetsDirectoryExists,
                         manifestExists = result.ManifestExists,
-                        installedVersion = result.InstalledVersion
+                        source = result.Source
                     },
                     issues = result.Issues
                 }, result.HasIssues ? 1 : 0);
@@ -47,9 +47,15 @@ public sealed class DoctorCommand : BaseCommand
                 Console.WriteLine($"Assets Directory:  {(result.AssetsDirectoryExists ? "✓" : "✗")}");
                 Console.WriteLine($"Manifest:          {(result.ManifestExists ? "✓" : "✗")}");
 
-                if (result.InstalledVersion != null)
+                if (result.Source != null)
                 {
-                    Console.WriteLine($"Installed Version: {result.InstalledVersion}");
+                    var sourceDesc = result.Source.Type switch
+                    {
+                        "default" => "default templates",
+                        "remote" => $"remote: {result.Source.Repo}@{result.Source.Branch}",
+                        _ => result.Source.Type
+                    };
+                    Console.WriteLine($"Template Source:   {sourceDesc}");
                 }
 
                 Console.WriteLine();
