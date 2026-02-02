@@ -26,37 +26,24 @@ public sealed class GitHubClient : IDisposable
         client.DefaultRequestHeaders.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
         client.Timeout = TimeSpan.FromSeconds(30);
-        
+
         // Add GitHub token for authentication (supports private repos)
         var token = GetGitHubToken();
         if (!string.IsNullOrEmpty(token))
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
-        
+
         return client;
     }
 
     /// <summary>
-    /// Get GitHub token from environment or gh CLI.
+    /// Get GitHub token from gh CLI or environment variables.
+    /// Priority: gh CLI → GITHUB_TOKEN → GH_TOKEN
     /// </summary>
     private static string? GetGitHubToken()
     {
-        // Try GITHUB_TOKEN environment variable first
-        var token = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
-        if (!string.IsNullOrEmpty(token))
-        {
-            return token;
-        }
-
-        // Try GH_TOKEN (GitHub Actions)
-        token = Environment.GetEnvironmentVariable("GH_TOKEN");
-        if (!string.IsNullOrEmpty(token))
-        {
-            return token;
-        }
-
-        // Try to get token from gh CLI
+        // Try gh CLI first (best for local CLI usage)
         try
         {
             var process = new System.Diagnostics.Process
@@ -83,7 +70,21 @@ public sealed class GitHubClient : IDisposable
         }
         catch
         {
-            // gh CLI not available or failed
+            // gh CLI not available or failed, try env vars
+        }
+
+        // Try GITHUB_TOKEN (explicit override or CI)
+        var token = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
+        if (!string.IsNullOrEmpty(token))
+        {
+            return token;
+        }
+
+        // Try GH_TOKEN (GitHub Actions)
+        token = Environment.GetEnvironmentVariable("GH_TOKEN");
+        if (!string.IsNullOrEmpty(token))
+        {
+            return token;
         }
 
         return null;
