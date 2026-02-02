@@ -1,7 +1,10 @@
 using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
 using DevTools.CopilotAssets.Commands;
+using DevTools.CopilotAssets.Domain.Configuration;
 using DevTools.CopilotAssets.Services;
+using DevTools.CopilotAssets.Services.Http;
+using DevTools.CopilotAssets.Services.Templates;
 
 namespace DevTools.CopilotAssets;
 
@@ -33,8 +36,31 @@ public static class Program
         services.AddSingleton<IFileSystemService, FileSystemService>();
         services.AddSingleton<IGitService, GitService>();
 
+        // Configuration
+        services.AddSingleton(_ => RemoteConfig.Load());
+
+        // Template providers
+        services.AddSingleton<GitHubClient>();
+        services.AddSingleton<BundledTemplateProvider>();
+        services.AddSingleton<ITemplateProvider>(sp =>
+        {
+            var config = sp.GetRequiredService<RemoteConfig>();
+            var fileSystem = sp.GetRequiredService<IFileSystemService>();
+            var gitHubClient = sp.GetRequiredService<GitHubClient>();
+
+            // Use remote provider if configured, otherwise bundled
+            if (config.HasRemoteSource)
+            {
+                return new RemoteTemplateProvider(config, fileSystem, gitHubClient);
+            }
+            return sp.GetRequiredService<BundledTemplateProvider>();
+        });
+
         // Application services
-        services.AddSingleton<SyncEngine>();
+        services.AddSingleton<SyncEngine>(sp => new SyncEngine(
+            sp.GetRequiredService<IFileSystemService>(),
+            sp.GetRequiredService<IGitService>(),
+            sp.GetRequiredService<ITemplateProvider>()));
         services.AddSingleton<ValidationEngine>();
         services.AddSingleton<IPolicyAppService, PolicyAppService>();
 
@@ -61,6 +87,7 @@ public static class Program
             ListCommand.Create(policyService, jsonOption),
             VerifyCommand.Create(policyService, jsonOption),
             DoctorCommand.Create(policyService, jsonOption),
+            ConfigCommand.Create(jsonOption),
             VersionCommand.Create(jsonOption)
         };
 

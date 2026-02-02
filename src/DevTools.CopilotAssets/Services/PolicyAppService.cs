@@ -39,7 +39,7 @@ public sealed class PolicyAppService : IPolicyAppService
         }
 
         // Sync assets with optional filter
-        var syncResult = _syncEngine.SyncAssets(targetDir, options.Force, options.Filter);
+        var syncResult = await _syncEngine.SyncAssetsAsync(targetDir, options.Force, options.Filter);
 
         if (!syncResult.Success)
         {
@@ -108,7 +108,7 @@ public sealed class PolicyAppService : IPolicyAppService
         }
 
         // Sync with force to update
-        var syncResult = _syncEngine.SyncAssets(targetDir, force: true, options.Filter);
+        var syncResult = await _syncEngine.SyncAssetsAsync(targetDir, force: true, options.Filter);
 
         if (!syncResult.Success)
         {
