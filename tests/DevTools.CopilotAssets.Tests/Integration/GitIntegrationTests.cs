@@ -86,7 +86,7 @@ public class GitIntegrationTests : IDisposable
     }
 
     [Fact]
-    public void EnsureGitignoreAllowsCopilotAssets_WithNoGitignore_ShouldCreateOne()
+    public void EnsureGitignoreIgnoresCopilotAssets_WithNoGitignore_ShouldCreateOne()
     {
         // Arrange
         Repository.Init(_tempDir);
@@ -94,7 +94,7 @@ public class GitIntegrationTests : IDisposable
         File.Exists(gitignorePath).Should().BeFalse();
 
         // Act
-        _gitService.EnsureGitignoreAllowsCopilotAssets(_tempDir);
+        _gitService.EnsureGitignoreIgnoresCopilotAssets(_tempDir);
 
         // Assert
         File.Exists(gitignorePath).Should().BeTrue();
@@ -103,7 +103,7 @@ public class GitIntegrationTests : IDisposable
     }
 
     [Fact]
-    public void EnsureGitignoreAllowsCopilotAssets_WithExistingGitignore_ShouldAppend()
+    public void EnsureGitignoreIgnoresCopilotAssets_WithExistingGitignore_ShouldAppend()
     {
         // Arrange
         Repository.Init(_tempDir);
@@ -111,7 +111,7 @@ public class GitIntegrationTests : IDisposable
         File.WriteAllText(gitignorePath, "# Existing content\nnode_modules/\n");
 
         // Act
-        _gitService.EnsureGitignoreAllowsCopilotAssets(_tempDir);
+        _gitService.EnsureGitignoreIgnoresCopilotAssets(_tempDir);
 
         // Assert
         var content = File.ReadAllText(gitignorePath);

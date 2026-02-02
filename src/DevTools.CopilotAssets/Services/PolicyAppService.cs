@@ -47,10 +47,10 @@ public sealed class PolicyAppService : IPolicyAppService
             return result;
         }
 
-        // Update .gitignore to ensure Copilot assets are tracked
+        // Update .gitignore to ensure Copilot assets are ignored
         if (!options.NoGit && _git.IsRepository(targetDir))
         {
-            _git.EnsureGitignoreAllowsCopilotAssets(targetDir);
+            _git.EnsureGitignoreIgnoresCopilotAssets(targetDir);
         }
 
         // Git operations
@@ -67,10 +67,17 @@ public sealed class PolicyAppService : IPolicyAppService
                 filesToStage.Add(gitignorePath);
             }
 
-            _git.Stage(targetDir, filesToStage.ToArray());
-            _git.Commit(targetDir, $"chore: install copilot assets v{SyncEngine.AssetVersion}");
-
-            result.Info.Add("Changes committed to git");
+            // Prompt user for confirmation
+            if (PromptUserForCommit(syncResult.Synced.Count))
+            {
+                _git.Stage(targetDir, filesToStage.ToArray());
+                _git.Commit(targetDir, $"chore: install copilot assets v{SyncEngine.AssetVersion}");
+                result.Info.Add("Changes committed to git");
+            }
+            else
+            {
+                result.Info.Add("Changes not committed. Files are ready to be staged.");
+            }
         }
 
         result.Info.Add($"✓ Installed {syncResult.Synced.Count} asset(s)");
@@ -112,7 +119,7 @@ public sealed class PolicyAppService : IPolicyAppService
         // Update .gitignore
         if (!options.NoGit && _git.IsRepository(targetDir))
         {
-            _git.EnsureGitignoreAllowsCopilotAssets(targetDir);
+            _git.EnsureGitignoreIgnoresCopilotAssets(targetDir);
         }
 
         // Git operations
@@ -128,10 +135,17 @@ public sealed class PolicyAppService : IPolicyAppService
                 filesToStage.Add(gitignorePath);
             }
 
-            _git.Stage(targetDir, filesToStage.ToArray());
-            _git.Commit(targetDir, $"chore: update copilot assets to v{SyncEngine.AssetVersion}");
-
-            result.Info.Add("Changes committed to git");
+            // Prompt user for confirmation
+            if (PromptUserForCommit(syncResult.Synced.Count))
+            {
+                _git.Stage(targetDir, filesToStage.ToArray());
+                _git.Commit(targetDir, $"chore: update copilot assets to v{SyncEngine.AssetVersion}");
+                result.Info.Add("Changes committed to git");
+            }
+            else
+            {
+                result.Info.Add("Changes not committed. Files are ready to be staged.");
+            }
         }
 
         var updated = syncResult.Synced.Count(s => s.WasUpdated);
@@ -507,5 +521,20 @@ public sealed class PolicyAppService : IPolicyAppService
         };
 
         return await PreviewInitAsync(initOptions);
+    }
+
+    /// <summary>
+    /// Prompt user for confirmation before committing changes.
+    /// </summary>
+    private bool PromptUserForCommit(int fileCount)
+    {
+        Console.WriteLine();
+        Console.WriteLine($"Ready to commit {fileCount} file(s) to git.");
+        Console.Write("Do you want to commit these changes? [Y/n]: ");
+
+        var response = Console.ReadLine()?.Trim().ToLowerInvariant();
+
+        // Default to Yes if user just presses Enter
+        return string.IsNullOrEmpty(response) || response == "y" || response == "yes";
     }
 }

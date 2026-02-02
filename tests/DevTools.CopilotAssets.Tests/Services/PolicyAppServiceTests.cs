@@ -102,7 +102,7 @@ public class PolicyAppServiceTests
         await _sut.InitAsync(options);
 
         // Assert
-        _mockGit.Verify(g => g.EnsureGitignoreAllowsCopilotAssets(It.IsAny<string>()), Times.Once);
+        _mockGit.Verify(g => g.EnsureGitignoreIgnoresCopilotAssets(It.IsAny<string>()), Times.Once);
     }
 
     [Fact]
@@ -123,7 +123,7 @@ public class PolicyAppServiceTests
         await _sut.InitAsync(options);
 
         // Assert
-        _mockGit.Verify(g => g.EnsureGitignoreAllowsCopilotAssets(It.IsAny<string>()), Times.Never);
+        _mockGit.Verify(g => g.EnsureGitignoreIgnoresCopilotAssets(It.IsAny<string>()), Times.Never);
     }
 
     [Fact]

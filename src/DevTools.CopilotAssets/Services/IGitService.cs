@@ -31,10 +31,9 @@ public interface IGitService
     void Commit(string repoPath, string message);
 
     /// <summary>
-    /// Ensure .gitignore includes negation patterns for Copilot assets.
-    /// This ensures .github/copilot assets are NOT ignored.
+    /// Ensure .gitignore ignores Copilot assets.
     /// </summary>
-    void EnsureGitignoreAllowsCopilotAssets(string repoPath);
+    void EnsureGitignoreIgnoresCopilotAssets(string repoPath);
 
     /// <summary>
     /// Get the repository root directory.
