@@ -46,3 +46,10 @@ publish/
 
 # User secrets
 secrets.json
+
+# GitHub Copilot Assets - Managed by copilot-assets CLI
+.github/copilot-instructions.md
+.github/prompts/
+.github/agents/
+.github/skills/
+.github/.copilot-assets.json
