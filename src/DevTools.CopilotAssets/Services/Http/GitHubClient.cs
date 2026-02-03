@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using DevTools.CopilotAssets.Infrastructure.Security;
 
 namespace DevTools.CopilotAssets.Services.Http;
 
@@ -179,11 +180,20 @@ public sealed class GitHubClient : IDisposable
 
             if (item.Type == "file")
             {
-                files.Add(new GitHubFileInfo
+                // Sanitize path to prevent traversal attacks
+                try
                 {
-                    Path = relativePath,
-                    DownloadUrl = item.DownloadUrl ?? $"{RawGitHubBase}/{owner}/{repo}/{branch}/.github/{relativePath}"
-                });
+                    var sanitized = InputValidator.SanitizePath(relativePath);
+                    files.Add(new GitHubFileInfo
+                    {
+                        Path = sanitized,
+                        DownloadUrl = item.DownloadUrl ?? $"{RawGitHubBase}/{owner}/{repo}/{branch}/.github/{sanitized}"
+                    });
+                }
+                catch (SecurityException ex)
+                {
+                    Console.Error.WriteLine($"Warning: Skipping file with invalid path: {ex.Message}");
+                }
             }
             else if (item.Type == "dir" && !string.IsNullOrEmpty(item.Url))
             {
@@ -212,11 +222,20 @@ public sealed class GitHubClient : IDisposable
     {
         try
         {
-            var response = await _httpClient.GetAsync(downloadUrl, ct);
+            var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
             if (!response.IsSuccessStatusCode)
             {
                 return null;
             }
+
+            // Check file size before downloading (prevent DoS)
+            if (response.Content.Headers.ContentLength.HasValue &&
+                response.Content.Headers.ContentLength.Value > ContentLimits.MaxFileSize)
+            {
+                Console.Error.WriteLine($"Warning: File too large ({response.Content.Headers.ContentLength.Value} bytes), skipping");
+                return null;
+            }
+
             return await response.Content.ReadAsStringAsync(ct);
         }
         catch

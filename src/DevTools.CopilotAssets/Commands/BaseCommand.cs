@@ -1,4 +1,5 @@
 using DevTools.CopilotAssets.Infrastructure;
+using DevTools.CopilotAssets.Infrastructure.Security;
 
 namespace DevTools.CopilotAssets.Commands;
 
@@ -18,7 +19,22 @@ public abstract class BaseCommand
     protected static void WriteError(string message)
     {
         if (!JsonMode)
-            Console.Error.WriteLine($"✗ {message}");
+        {
+            // Redact sensitive data from error messages
+            var safe = TokenRedactor.RedactSensitiveData(message);
+            safe = TokenRedactor.RedactPaths(safe);
+            Console.Error.WriteLine($"✗ {safe}");
+        }
+    }
+
+    protected static void WriteException(Exception ex)
+    {
+        if (!JsonMode)
+        {
+            // Sanitize exception before displaying
+            var safe = TokenRedactor.SanitizeException(ex);
+            Console.Error.WriteLine($"✗ {safe}");
+        }
     }
 
     protected static void WriteWarning(string message)

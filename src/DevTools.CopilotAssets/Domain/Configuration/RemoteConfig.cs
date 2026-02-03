@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DevTools.CopilotAssets.Infrastructure.Security;
 
 namespace DevTools.CopilotAssets.Domain.Configuration;
 
@@ -101,12 +102,14 @@ public sealed record RemoteConfig
     /// </summary>
     public static bool IsValidSource(string source)
     {
-        if (string.IsNullOrWhiteSpace(source))
-            return false;
+        return InputValidator.IsValidRepository(source);
+    }
 
-        var parts = source.Split('/');
-        return parts.Length == 2
-            && !string.IsNullOrWhiteSpace(parts[0])
-            && !string.IsNullOrWhiteSpace(parts[1]);
+    /// <summary>
+    /// Validate the branch name.
+    /// </summary>
+    public static bool IsValidBranch(string branch)
+    {
+        return InputValidator.IsValidBranch(branch);
     }
 }

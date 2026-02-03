@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using DevTools.CopilotAssets.Domain;
+using DevTools.CopilotAssets.Infrastructure.Security;
 using DevTools.CopilotAssets.Services.Results;
 using DevTools.CopilotAssets.Services.Templates;
 
@@ -207,7 +208,24 @@ public sealed class SyncEngine
         }
 
         var json = _fileSystem.ReadAllText(manifestPath);
-        return Manifest.FromJson(json);
+        var manifest = Manifest.FromJson(json);
+        
+        // Validate manifest for security issues
+        if (manifest != null)
+        {
+            try
+            {
+                ManifestValidator.Validate(manifest);
+            }
+            catch (SecurityException ex)
+            {
+                Console.Error.WriteLine($"Warning: Manifest validation failed: {ex.Message}");
+                // Return null to force re-initialization
+                return null;
+            }
+        }
+        
+        return manifest;
     }
 
     /// <summary>
