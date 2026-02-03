@@ -5,7 +5,7 @@ namespace DevTools.CopilotAssets.Services.Templates;
 
 /// <summary>
 /// Provides templates from a remote GitHub repository.
-/// Falls back to default templates if remote is unavailable.
+/// Returns an error if remote fetching fails - does not fall back automatically.
 /// </summary>
 public sealed class RemoteTemplateProvider : ITemplateProvider, IDisposable
 {
@@ -34,20 +34,27 @@ public sealed class RemoteTemplateProvider : ITemplateProvider, IDisposable
             return await _fallbackProvider.GetTemplatesAsync(ct);
         }
 
-        var (owner, repo) = ParseSource(_config.Source);
-        var source = $"remote:{_config.Source}@{_config.Branch}";
-
-        // Try to fetch from remote
-        var result = await FetchFromRemoteAsync(owner, repo, _config.Branch, ct);
-
-        if (result.HasTemplates)
+        try
         {
-            return result with { Source = source };
-        }
+            var (owner, repo) = ParseSource(_config.Source);
+            var source = $"remote:{_config.Source}@{_config.Branch}";
 
-        // Remote failed - return error, don't silently fall back
-        // The caller should handle this and offer options to the user
-        return TemplateResult.Failed(source, result.Error ?? "Failed to fetch remote templates");
+            // Try to fetch from remote
+            var result = await FetchFromRemoteAsync(owner, repo, _config.Branch, ct);
+
+            if (result.HasTemplates)
+            {
+                return result with { Source = source };
+            }
+
+            // Remote failed - return error, don't silently fall back
+            // The caller should handle this and offer options to the user
+            return TemplateResult.Failed(source, result.Error ?? "Failed to fetch remote templates");
+        }
+        catch (ArgumentException ex)
+        {
+            return TemplateResult.Failed($"remote:{_config.Source}", ex.Message);
+        }
     }
 
     /// <inheritdoc />
@@ -58,9 +65,16 @@ public sealed class RemoteTemplateProvider : ITemplateProvider, IDisposable
             return false;
         }
 
-        var (owner, repo) = ParseSource(_config.Source);
-        var result = await _gitHubClient.GetDirectoryContentsAsync(owner, repo, ".github", _config.Branch, ct);
-        return result.Success;
+        try
+        {
+            var (owner, repo) = ParseSource(_config.Source);
+            var result = await _gitHubClient.GetDirectoryContentsAsync(owner, repo, ".github", _config.Branch, ct);
+            return result.Success;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     private async Task<TemplateResult> FetchFromRemoteAsync(
@@ -100,6 +114,10 @@ public sealed class RemoteTemplateProvider : ITemplateProvider, IDisposable
     private static (string Owner, string Repo) ParseSource(string source)
     {
         var parts = source.Split('/');
+        if (parts.Length != 2 || string.IsNullOrWhiteSpace(parts[0]) || string.IsNullOrWhiteSpace(parts[1]))
+        {
+            throw new ArgumentException($"Invalid source format '{source}'. Expected format: 'owner/repo'", nameof(source));
+        }
         return (parts[0], parts[1]);
     }
 

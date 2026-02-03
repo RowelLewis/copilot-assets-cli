@@ -243,11 +243,11 @@ public sealed class SyncEngine
         }
 
         // Compare each template against installed checksums
-        foreach (var template in templateResult.Templates)
-        {
-            if (filter != null && !filter.ShouldIncludePath(template.RelativePath))
-                continue;
+        var filteredTemplates = templateResult.Templates
+            .Where(template => filter == null || filter.ShouldIncludePath(template.RelativePath));
 
+        foreach (var template in filteredTemplates)
+        {
             var newChecksum = ComputeChecksum(template.Content);
             var installedChecksum = manifest.Checksums.GetValueOrDefault(template.RelativePath);
 
@@ -267,11 +267,12 @@ public sealed class SyncEngine
 
         // Check for removed files
         var templatePaths = templateResult.Templates.Select(t => t.RelativePath).ToHashSet();
-        foreach (var asset in manifest.Assets.Where(a => a != Manifest.FileName))
-        {
-            if (filter != null && !filter.ShouldIncludePath(asset))
-                continue;
+        var filteredAssets = manifest.Assets
+            .Where(a => a != Manifest.FileName)
+            .Where(asset => filter == null || filter.ShouldIncludePath(asset));
 
+        foreach (var asset in filteredAssets)
+        {
             if (!templatePaths.Contains(asset))
             {
                 result.Removed.Add(asset);
@@ -498,15 +499,9 @@ public sealed class SyncEngine
         var provider = GetProvider(sourceOverride);
 
         // Get templates
-        TemplateResult templateResult;
-        if (provider != null)
-        {
-            templateResult = await provider.GetTemplatesAsync(ct);
-        }
-        else
-        {
-            templateResult = await GetDefaultTemplatesAsync(ct);
-        }
+        TemplateResult templateResult = provider != null
+            ? await provider.GetTemplatesAsync(ct)
+            : await GetDefaultTemplatesAsync(ct);
 
         LastTemplateSource = templateResult.Source;
 

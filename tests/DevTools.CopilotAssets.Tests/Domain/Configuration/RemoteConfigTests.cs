@@ -63,12 +63,12 @@ public class RemoteConfigTests
     {
         // Arrange
         var configPath = RemoteConfig.GetConfigPath();
-        var configDir = Path.GetDirectoryName(configPath)!;
-
-        // Clean up before test
+        string? backupContent = null;
+        
+        // Backup existing config if it exists
         if (File.Exists(configPath))
         {
-            File.Delete(configPath);
+            backupContent = File.ReadAllText(configPath);
         }
 
         var originalConfig = new RemoteConfig
@@ -90,8 +90,12 @@ public class RemoteConfigTests
         }
         finally
         {
-            // Cleanup
-            if (File.Exists(configPath))
+            // Restore or cleanup
+            if (backupContent != null)
+            {
+                File.WriteAllText(configPath, backupContent);
+            }
+            else if (File.Exists(configPath))
             {
                 File.Delete(configPath);
             }
@@ -103,33 +107,77 @@ public class RemoteConfigTests
     {
         // Arrange
         var configPath = RemoteConfig.GetConfigPath();
+        string? backupContent = null;
+        
+        // Backup existing config if it exists
         if (File.Exists(configPath))
         {
+            backupContent = File.ReadAllText(configPath);
             File.Delete(configPath);
         }
 
-        // Act
-        var config = RemoteConfig.Load();
+        try
+        {
+            // Act
+            var config = RemoteConfig.Load();
 
-        // Assert
-        config.Source.Should().BeNull();
-        config.Branch.Should().Be("main");
-        config.HasRemoteSource.Should().BeFalse();
+            // Assert
+            config.Source.Should().BeNull();
+            config.Branch.Should().Be("main");
+            config.HasRemoteSource.Should().BeFalse();
+        }
+        finally
+        {
+            // Restore backup if it existed
+            if (backupContent != null)
+            {
+                var dir = Path.GetDirectoryName(configPath)!;
+                if (!Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+                File.WriteAllText(configPath, backupContent);
+            }
+        }
     }
 
     [Fact]
     public void Reset_ShouldDeleteConfigFile()
     {
         // Arrange
+        var configPath = RemoteConfig.GetConfigPath();
+        string? backupContent = null;
+        
+        // Backup existing config if it exists
+        if (File.Exists(configPath))
+        {
+            backupContent = File.ReadAllText(configPath);
+        }
+        
         var config = new RemoteConfig { Source = "test/repo" };
         config.Save();
-        var configPath = RemoteConfig.GetConfigPath();
 
-        // Act
-        RemoteConfig.Reset();
+        try
+        {
+            // Act
+            RemoteConfig.Reset();
 
-        // Assert
-        File.Exists(configPath).Should().BeFalse();
+            // Assert
+            File.Exists(configPath).Should().BeFalse();
+        }
+        finally
+        {
+            // Restore backup if it existed
+            if (backupContent != null)
+            {
+                var dir = Path.GetDirectoryName(configPath)!;
+                if (!Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+                File.WriteAllText(configPath, backupContent);
+            }
+        }
     }
 
     [Fact]

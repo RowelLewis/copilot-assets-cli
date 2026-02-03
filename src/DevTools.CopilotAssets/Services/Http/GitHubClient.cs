@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using DevTools.CopilotAssets.Services;
 
 namespace DevTools.CopilotAssets.Services.Http;
 
@@ -46,7 +47,7 @@ public sealed class GitHubClient : IDisposable
         // Try gh CLI first (best for local CLI usage)
         try
         {
-            var process = new System.Diagnostics.Process
+            using var process = new System.Diagnostics.Process
             {
                 StartInfo = new System.Diagnostics.ProcessStartInfo
                 {

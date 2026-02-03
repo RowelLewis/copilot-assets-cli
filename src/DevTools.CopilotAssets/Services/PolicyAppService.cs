@@ -133,7 +133,7 @@ public sealed class PolicyAppService : IPolicyAppService
         }
 
         // Sync with force to update
-        var syncResult = await _syncEngine.SyncAssetsAsync(targetDir, force: true, options.Filter, sourceOverride);
+        var syncResult = await _syncEngine.SyncAssetsAsync(targetDir, true, options.Filter, sourceOverride);
 
         if (!syncResult.Success)
         {
@@ -245,17 +245,13 @@ public sealed class PolicyAppService : IPolicyAppService
         var assets = new List<AssetInfo>();
         int valid = 0, modified = 0, missing = 0;
 
-        foreach (var assetPath in manifest.Assets)
+        var filteredAssets = manifest.Assets
+            .Where(assetPath => assetPath != Manifest.FileName)
+            .Where(assetPath => options.Filter == null || options.Filter.ShouldInclude(AssetTypeFilter.GetCategory(assetPath)));
+
+        foreach (var assetPath in filteredAssets)
         {
-            // Skip manifest file itself
-            if (assetPath == Manifest.FileName)
-                continue;
-
             var category = AssetTypeFilter.GetCategory(assetPath);
-
-            // Apply filter if specified
-            if (options.Filter != null && !options.Filter.ShouldInclude(category))
-                continue;
 
             var fullPath = _fileSystem.CombinePath(targetDir, ".github", assetPath);
             var name = Path.GetFileName(assetPath);
@@ -310,17 +306,13 @@ public sealed class PolicyAppService : IPolicyAppService
         var results = new List<VerifyAssetResult>();
         var warnings = new List<string>();
 
-        foreach (var assetPath in manifest.Assets)
+        var filteredAssets = manifest.Assets
+            .Where(assetPath => assetPath != Manifest.FileName)
+            .Where(assetPath => options.Filter == null || options.Filter.ShouldInclude(AssetTypeFilter.GetCategory(assetPath)));
+
+        foreach (var assetPath in filteredAssets)
         {
-            // Skip manifest file itself
-            if (assetPath == Manifest.FileName)
-                continue;
-
             var category = AssetTypeFilter.GetCategory(assetPath);
-
-            // Apply filter
-            if (options.Filter != null && !options.Filter.ShouldInclude(category))
-                continue;
 
             var fullPath = _fileSystem.CombinePath(targetDir, ".github", assetPath);
             var name = Path.GetFileName(assetPath);
