@@ -8,25 +8,41 @@ public class ManifestTests
     public void Create_ShouldInitializeWithCorrectValues()
     {
         // Arrange
-        var version = "1.0.0";
         var toolVersion = "1.0.0.0";
 
         // Act
-        var manifest = Manifest.Create(version, toolVersion);
+        var manifest = Manifest.Create(toolVersion);
 
         // Assert
-        manifest.Version.Should().Be(version);
+        manifest.SchemaVersion.Should().Be(Manifest.CurrentSchemaVersion);
         manifest.ToolVersion.Should().Be(toolVersion);
         manifest.InstalledAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
         manifest.Assets.Should().BeEmpty();
         manifest.Checksums.Should().BeEmpty();
+        manifest.Source.Type.Should().Be("default");
+    }
+
+    [Fact]
+    public void Create_WithSource_ShouldSetSource()
+    {
+        // Arrange
+        var toolVersion = "1.0.0.0";
+        var source = TemplateSource.Remote("owner/repo", "main");
+
+        // Act
+        var manifest = Manifest.Create(toolVersion, source);
+
+        // Assert
+        manifest.Source.Type.Should().Be("remote");
+        manifest.Source.Repo.Should().Be("owner/repo");
+        manifest.Source.Branch.Should().Be("main");
     }
 
     [Fact]
     public void ToJson_ShouldSerializeCorrectly()
     {
         // Arrange
-        var manifest = Manifest.Create("1.2.3", "1.0.0.0");
+        var manifest = Manifest.Create("1.0.0.0");
         manifest.Assets.Add("copilot-instructions.md");
         manifest.Assets.Add("prompts/test.md");
         manifest.Checksums["copilot-instructions.md"] = "abc123";
@@ -36,7 +52,7 @@ public class ManifestTests
         var json = manifest.ToJson();
 
         // Assert
-        json.Should().Contain("\"version\": \"1.2.3\"");
+        json.Should().Contain("\"schemaVersion\": 2");
         json.Should().Contain("\"toolVersion\": \"1.0.0.0\"");
         json.Should().Contain("\"copilot-instructions.md\"");
         json.Should().Contain("\"prompts/test.md\"");
@@ -50,9 +66,10 @@ public class ManifestTests
         // Arrange
         var json = """
         {
-            "version": "2.0.0",
+            "schemaVersion": 2,
             "installedAt": "2026-01-31T12:00:00Z",
             "toolVersion": "1.5.0",
+            "source": { "type": "bundled" },
             "assets": ["file1.md", "file2.md"],
             "checksums": {
                 "file1.md": "hash1",
@@ -66,7 +83,7 @@ public class ManifestTests
 
         // Assert
         manifest.Should().NotBeNull();
-        manifest!.Version.Should().Be("2.0.0");
+        manifest!.SchemaVersion.Should().Be(2);
         manifest.ToolVersion.Should().Be("1.5.0");
         manifest.Assets.Should().HaveCount(2);
         manifest.Assets.Should().Contain("file1.md");
@@ -93,7 +110,7 @@ public class ManifestTests
     public void RoundTrip_ShouldPreserveData()
     {
         // Arrange
-        var original = Manifest.Create("1.0.0", "2.0.0");
+        var original = Manifest.Create("2.0.0", TemplateSource.Remote("test/repo", "develop"));
         original.Assets.Add("test.md");
         original.Checksums["test.md"] = "checksum123";
 
@@ -103,8 +120,11 @@ public class ManifestTests
 
         // Assert
         restored.Should().NotBeNull();
-        restored!.Version.Should().Be(original.Version);
+        restored!.SchemaVersion.Should().Be(original.SchemaVersion);
         restored.ToolVersion.Should().Be(original.ToolVersion);
+        restored.Source.Type.Should().Be(original.Source.Type);
+        restored.Source.Repo.Should().Be(original.Source.Repo);
+        restored.Source.Branch.Should().Be(original.Source.Branch);
         restored.Assets.Should().BeEquivalentTo(original.Assets);
         restored.Checksums.Should().BeEquivalentTo(original.Checksums);
     }

@@ -9,18 +9,15 @@ public sealed class GitService : IGitService
 {
     private readonly IFileSystemService _fileSystem;
 
-    // Patterns to add to .gitignore to ensure Copilot assets are tracked
-    private static readonly string[] CopilotAssetNegationPatterns =
+    // Patterns to add to .gitignore to ignore Copilot assets
+    private static readonly string[] CopilotAssetIgnorePatterns =
     [
-        "# GitHub Copilot Assets - DO NOT IGNORE",
-        "!.github/copilot-instructions.md",
-        "!.github/prompts/",
-        "!.github/prompts/**",
-        "!.github/agents/",
-        "!.github/agents/**",
-        "!.github/skills/",
-        "!.github/skills/**",
-        "!.github/.copilot-assets.json"
+        "# GitHub Copilot Assets - Managed by copilot-assets CLI",
+        ".github/copilot-instructions.md",
+        ".github/prompts/",
+        ".github/agents/",
+        ".github/skills/",
+        ".github/.copilot-assets.json"
     ];
 
     public GitService(IFileSystemService fileSystem)
@@ -92,6 +89,14 @@ public sealed class GitService : IGitService
 
         using var repo = new Repository(repoRoot);
 
+        // Check if there are any changes to commit
+        var status = repo.RetrieveStatus();
+        if (!status.Any(s => s.State != FileStatus.Ignored && s.State != FileStatus.Unaltered))
+        {
+            // No changes to commit - this is fine, just return
+            return;
+        }
+
         // Get or create signature
         var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
         if (signature == null)
@@ -99,10 +104,18 @@ public sealed class GitService : IGitService
             signature = new Signature("Copilot Assets CLI", "copilot-assets@local", DateTimeOffset.Now);
         }
 
-        repo.Commit(message, signature, signature);
+        try
+        {
+            repo.Commit(message, signature, signature);
+        }
+        catch (EmptyCommitException)
+        {
+            // No changes to commit - this is fine, just return
+            return;
+        }
     }
 
-    public void EnsureGitignoreAllowsCopilotAssets(string repoPath)
+    public void EnsureGitignoreIgnoresCopilotAssets(string repoPath)
     {
         var repoRoot = GetRepositoryRoot(repoPath);
         if (repoRoot == null) return;
@@ -115,7 +128,7 @@ public sealed class GitService : IGitService
         var lines = existingContent.Split('\n').ToList();
         var modified = false;
 
-        foreach (var pattern in CopilotAssetNegationPatterns)
+        foreach (var pattern in CopilotAssetIgnorePatterns)
         {
             if (!lines.Any(l => l.Trim() == pattern.Trim()))
             {
@@ -129,7 +142,7 @@ public sealed class GitService : IGitService
             // Ensure there's a blank line before our section if content exists
             if (!string.IsNullOrWhiteSpace(existingContent) && !existingContent.EndsWith('\n'))
             {
-                lines.Insert(lines.Count - CopilotAssetNegationPatterns.Length, "");
+                lines.Insert(lines.Count - CopilotAssetIgnorePatterns.Length, "");
             }
 
             _fileSystem.WriteAllText(gitignorePath, string.Join('\n', lines));

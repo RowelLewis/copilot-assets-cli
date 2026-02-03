@@ -6,17 +6,12 @@ namespace DevTools.CopilotAssets.Domain;
 public sealed record PolicyDefinition
 {
     /// <summary>
-    /// Minimum required version of assets.
+    /// Files that must exist for compliance.
     /// </summary>
-    public required string MinimumVersion { get; init; }
+    public required IReadOnlyList<string> RequiredFiles { get; init; }
 
     /// <summary>
-    /// List of files that must exist for compliance.
-    /// </summary>
-    public IReadOnlyList<string> RequiredFiles { get; init; } = [];
-
-    /// <summary>
-    /// Regex patterns that are not allowed in asset content (e.g., secrets).
+    /// Regex patterns that should not appear in assets (e.g., secrets).
     /// </summary>
     public IReadOnlyList<string> RestrictedPatterns { get; init; } = [];
 

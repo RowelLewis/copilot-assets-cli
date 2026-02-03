@@ -26,78 +26,42 @@ public interface IPolicyAppService
     /// Run diagnostics on the environment.
     /// </summary>
     Task<DiagnosticsResult> DiagnoseAsync();
-}
-
-/// <summary>
-/// Options for the init command.
-/// </summary>
-public sealed record InitOptions
-{
-    /// <summary>
-    /// Target directory (defaults to current directory).
-    /// </summary>
-    public string TargetDirectory { get; init; } = ".";
 
     /// <summary>
-    /// Overwrite existing files without prompting.
+    /// List all installed assets.
     /// </summary>
-    public bool Force { get; init; }
+    Task<AssetListResult> ListAssetsAsync(ListOptions options);
 
     /// <summary>
-    /// Skip git operations (stage/commit).
+    /// Verify file integrity against manifest checksums.
     /// </summary>
-    public bool NoGit { get; init; }
-}
-
-/// <summary>
-/// Options for the update command.
-/// </summary>
-public sealed record UpdateOptions
-{
-    /// <summary>
-    /// Target directory (defaults to current directory).
-    /// </summary>
-    public string TargetDirectory { get; init; } = ".";
+    Task<VerifyResult> VerifyAsync(VerifyOptions options);
 
     /// <summary>
-    /// Overwrite local changes without prompting.
+    /// Preview what changes would be made without modifying anything.
     /// </summary>
-    public bool Force { get; init; }
+    Task<DryRunResult> PreviewInitAsync(InitOptions options);
 
     /// <summary>
-    /// Skip git operations.
+    /// Preview what update would do without modifying anything.
     /// </summary>
-    public bool NoGit { get; init; }
-}
-
-/// <summary>
-/// Options for the validate command.
-/// </summary>
-public sealed record ValidateOptions
-{
-    /// <summary>
-    /// Target directory (defaults to current directory).
-    /// </summary>
-    public string TargetDirectory { get; init; } = ".";
+    Task<DryRunResult> PreviewUpdateAsync(UpdateOptions options);
 
     /// <summary>
-    /// Running in CI mode (JSON output, strict exit codes).
+    /// Get pending file operations for interactive mode.
     /// </summary>
-    public bool CiMode { get; init; }
-}
+    Task<(List<PendingFile> Files, string? Source, string? Error)> GetPendingOperationsAsync(
+        string targetDirectory,
+        AssetTypeFilter? filter = null,
+        string? sourceOverride = null,
+        CancellationToken ct = default);
 
-/// <summary>
-/// Result of diagnostics check.
-/// </summary>
-public sealed class DiagnosticsResult
-{
-    public bool GitAvailable { get; init; }
-    public bool IsGitRepository { get; init; }
-    public bool AssetsDirectoryExists { get; init; }
-    public bool ManifestExists { get; init; }
-    public string? InstalledVersion { get; init; }
-    public string ToolVersion { get; init; } = "1.0.0";
-    public List<string> Issues { get; } = [];
-
-    public bool HasIssues => Issues.Count > 0;
+    /// <summary>
+    /// Execute sync for selected files only (interactive mode).
+    /// </summary>
+    ValidationResult ExecuteSelectiveSync(
+        string targetDirectory,
+        IEnumerable<PendingFile> selectedFiles,
+        string? source = null,
+        bool noGit = false);
 }

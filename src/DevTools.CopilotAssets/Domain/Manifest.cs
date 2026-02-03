@@ -5,6 +5,7 @@ namespace DevTools.CopilotAssets.Domain;
 
 /// <summary>
 /// Local manifest file (.github/.copilot-assets.json) tracking installed assets.
+/// Schema v2 - uses checksums for change detection instead of fake version numbers.
 /// </summary>
 public sealed class Manifest
 {
@@ -19,10 +20,15 @@ public sealed class Manifest
     public const string RelativePath = ".github/.copilot-assets.json";
 
     /// <summary>
-    /// Version of the installed assets.
+    /// Current schema version for the manifest format.
     /// </summary>
-    [JsonPropertyName("version")]
-    public required string Version { get; set; }
+    public const int CurrentSchemaVersion = 2;
+
+    /// <summary>
+    /// Schema version for manifest format compatibility.
+    /// </summary>
+    [JsonPropertyName("schemaVersion")]
+    public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
     /// <summary>
     /// When the assets were installed/updated.
@@ -35,6 +41,12 @@ public sealed class Manifest
     /// </summary>
     [JsonPropertyName("toolVersion")]
     public required string ToolVersion { get; set; }
+
+    /// <summary>
+    /// Source of the templates (default or remote).
+    /// </summary>
+    [JsonPropertyName("source")]
+    public TemplateSource Source { get; set; } = TemplateSource.Default();
 
     /// <summary>
     /// List of installed asset paths relative to .github folder.
@@ -68,10 +80,11 @@ public sealed class Manifest
     /// <summary>
     /// Create a new manifest with current timestamp.
     /// </summary>
-    public static Manifest Create(string version, string toolVersion) => new()
+    public static Manifest Create(string toolVersion, TemplateSource? source = null) => new()
     {
-        Version = version,
+        SchemaVersion = CurrentSchemaVersion,
         ToolVersion = toolVersion,
-        InstalledAt = DateTime.UtcNow
+        InstalledAt = DateTime.UtcNow,
+        Source = source ?? TemplateSource.Default()
     };
 }

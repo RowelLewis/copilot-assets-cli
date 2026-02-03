@@ -100,7 +100,7 @@ public class GitServiceTests
     }
 
     [Fact]
-    public void EnsureGitignoreAllowsCopilotAssets_WhenNotARepo_ShouldNotThrow()
+    public void EnsureGitignoreIgnoresCopilotAssets_WhenNotARepo_ShouldNotThrow()
     {
         // Arrange
         var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -109,7 +109,7 @@ public class GitServiceTests
         try
         {
             // Act & Assert - should not throw
-            var act = () => _sut.EnsureGitignoreAllowsCopilotAssets(tempDir);
+            var act = () => _sut.EnsureGitignoreIgnoresCopilotAssets(tempDir);
             act.Should().NotThrow();
         }
         finally
