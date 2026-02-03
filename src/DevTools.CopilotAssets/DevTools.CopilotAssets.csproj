@@ -9,7 +9,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>copilot-assets</ToolCommandName>
     <PackageId>copilot-assets</PackageId>
-    <Version>1.2.0</Version>
+    <Version>1.1.0</Version>
     <Description>GitHub Copilot Asset Distribution Tool - Install and sync Copilot prompts, agents, instructions, and skills</Description>
     <PackageProjectUrl>https://github.com/RowelLewis/copilot-assets-cli</PackageProjectUrl>
     <PackageTags>copilot;github;devtools;cli</PackageTags>
