@@ -67,7 +67,7 @@ public sealed record PendingFile(
             }
             // Convert kebab-case to title case (e.g., "coding-standards" -> "Coding Standards")
             var words = fileName.Split('-', '_');
-            var titleCase = string.Join(" ", words.Select(w => 
+            var titleCase = string.Join(" ", words.Select(w =>
                 char.ToUpper(w[0]) + w.Substring(1)));
             return $"{titleCase} Instructions";
         }
