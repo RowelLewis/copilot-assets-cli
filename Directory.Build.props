@@ -14,9 +14,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <Authors>DevTools Team</Authors>
-    <Company>DevTools</Company>
-    <Copyright>Copyright © 2026 DevTools Team</Copyright>
+    <Authors>Rowel Lewis</Authors>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 </Project>
