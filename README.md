@@ -22,6 +22,7 @@ This creates assets for your target AI tool(s). By default, assets are generated
 - `.github/prompts/` - Reusable prompt templates
 - `.github/agents/` - AI agent definitions
 - `.github/skills/` - Custom skills (SKILL.md format with YAML frontmatter)
+- `.github/instructions/` - Additional custom instructions (optional folder for organizing multiple instruction files)
 - `.github/.copilot-assets.json` - Manifest file tracking installed assets
 
 ### Multi-Tool Target Support
@@ -45,12 +46,12 @@ Each tool gets assets in its native format and directory structure:
 
 | Tool | Instructions | Prompts | Rules/Config |
 |------|-------------|---------|--------------|
-| **Copilot** | `.github/copilot-instructions.md` | `.github/prompts/` | `.github/agents/`, `.github/skills/` |
-| **Claude** | `CLAUDE.md` | `.claude/commands/` | `.claude/skills/` |
-| **Cursor** | `.cursor/rules/instructions.mdc` | `.cursor/rules/*.mdc` | YAML frontmatter |
-| **Windsurf** | `.windsurfrules` | `.windsurf/rules/` | — |
-| **Cline** | `.clinerules/instructions.md` | `.clinerules/` | — |
-| **Aider** | `CONVENTIONS.md` | `.aider/prompts/` | — |
+| **Copilot** | `.github/copilot-instructions.md`<br/>`.github/instructions/` | `.github/prompts/` | `.github/agents/`, `.github/skills/` |
+| **Claude** | `CLAUDE.md`<br/>`.claude/instructions/` | `.claude/commands/` | `.claude/skills/` |
+| **Cursor** | `.cursor/rules/instructions.mdc`<br/>`.cursor/rules/` | `.cursor/rules/*.mdc` | YAML frontmatter |
+| **Windsurf** | `.windsurfrules`<br/>`.windsurf/rules/` | `.windsurf/rules/` | — |
+| **Cline** | `.clinerules/instructions.md`<br/>`.clinerules/` | `.clinerules/` | — |
+| **Aider** | `CONVENTIONS.md`<br/>(instructions/ → root) | `.aider/prompts/` | — |
 
 **Tool-specific content sections:** Templates can include sections for specific tools using HTML comment markers:
 
@@ -431,9 +432,12 @@ Default output for Copilot:
 ├── agents/
 │   ├── documenter.agent.md
 │   └── reviewer.agent.md
-└── skills/
-    └── refactor/
-        └── SKILL.md                 # YAML frontmatter + markdown body
+├── skills/
+│   └── refactor/
+│       └── SKILL.md                 # YAML frontmatter + markdown body
+└── instructions/
+    ├── coding-standards.md          # Custom instructions (optional folder)
+    └── security-practices.md
 ```
 
 When targeting multiple tools (e.g., `--target copilot,claude,cursor`), additional output is generated:

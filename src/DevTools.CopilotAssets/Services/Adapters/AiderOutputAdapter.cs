@@ -22,8 +22,16 @@ public sealed class AiderOutputAdapter : IOutputAdapter
         return content;
     }
 
-    public string GetOutputPath(AssetType type, string fileName)
+    public string GetOutputPath(AssetType type, string relativePath)
     {
+        var fileName = Path.GetFileName(relativePath);
+
+        // Handle instructions from folder - add to root as separate files
+        if (type == AssetType.Instruction && (relativePath.Contains("instructions/") || relativePath.Contains("instructions\\")))
+        {
+            // Aider doesn't have an instructions folder, so prepend filename (e.g., coding-standards.md)
+            return Path.ChangeExtension(fileName, ".md");
+        }
         return type switch
         {
             AssetType.Instruction => "CONVENTIONS.md",

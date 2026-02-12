@@ -25,9 +25,16 @@ public sealed class CursorOutputAdapter : IOutputAdapter
         return frontmatter + "\n" + content;
     }
 
-    public string GetOutputPath(AssetType type, string fileName)
+    public string GetOutputPath(AssetType type, string relativePath)
     {
+        var fileName = Path.GetFileName(relativePath);
         var mdcName = Path.ChangeExtension(Path.GetFileNameWithoutExtension(fileName), ".mdc");
+
+        // Handle instructions from folder
+        if (type == AssetType.Instruction && (relativePath.Contains("instructions/") || relativePath.Contains("instructions\\")))
+        {
+            return Path.Combine(".cursor", "rules", mdcName);
+        }
 
         return type switch
         {

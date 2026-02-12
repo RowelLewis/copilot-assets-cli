@@ -16,12 +16,12 @@ public class CopilotOutputAdapterTests
 
     [Theory]
     [InlineData(AssetType.Instruction, "copilot-instructions.md")]
-    [InlineData(AssetType.Prompt, "code-review.prompt.md")]
-    [InlineData(AssetType.Agent, "reviewer.agent.md")]
-    [InlineData(AssetType.Skill, "refactor.skill.md")]
-    public void GetOutputPath_ShouldReturnCorrectPath(AssetType type, string fileName)
+    [InlineData(AssetType.Prompt, "prompts/code-review.prompt.md")]
+    [InlineData(AssetType.Agent, "agents/reviewer.agent.md")]
+    [InlineData(AssetType.Skill, "skills/refactor/SKILL.md")]
+    public void GetOutputPath_ShouldReturnCorrectPath(AssetType type, string relativePath)
     {
-        var result = _sut.GetOutputPath(type, fileName);
+        var result = _sut.GetOutputPath(type, relativePath);
 
         result.Should().StartWith(".github");
     }

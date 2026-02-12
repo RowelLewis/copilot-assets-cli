@@ -41,7 +41,7 @@ public class ClaudeOutputAdapterTests
     [Fact]
     public void GetOutputPath_Skill_ShouldReturnClaudeSkillMd()
     {
-        var result = _sut.GetOutputPath(AssetType.Skill, "refactor.skill.md");
+        var result = _sut.GetOutputPath(AssetType.Skill, "skills/refactor/SKILL.md");
 
         result.Should().Be(Path.Combine(".claude", "skills", "refactor", "SKILL.md"));
     }

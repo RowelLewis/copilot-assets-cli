@@ -14,9 +14,16 @@ public sealed class ClineOutputAdapter : IOutputAdapter
         return CopilotOutputAdapter.StripToolSpecificSections(markdownContent, "cline");
     }
 
-    public string GetOutputPath(AssetType type, string fileName)
+    public string GetOutputPath(AssetType type, string relativePath)
     {
+        var fileName = Path.GetFileName(relativePath);
         var mdName = Path.ChangeExtension(fileName, ".md");
+
+        // Handle instructions from folder
+        if (type == AssetType.Instruction && (relativePath.Contains("instructions/") || relativePath.Contains("instructions\\")))
+        {
+            return Path.Combine(".clinerules", mdName);
+        }
 
         return type switch
         {

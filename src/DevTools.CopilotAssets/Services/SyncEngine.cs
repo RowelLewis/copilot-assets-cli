@@ -20,11 +20,42 @@ public sealed record PendingFile(
 {
     /// <summary>
     /// Get the top-level folder or empty string for root files.
+    /// For skills, returns the skill folder path (e.g., "skills/refactor").
     /// </summary>
     public static string GetFolder(string relativePath)
     {
+        var normalized = relativePath.Replace("\\", "/");
+        var parts = normalized.Split('/');
+
+        // For skills, group by skill folder (e.g., "skills/refactor")
+        if (parts.Length >= 3 && parts[0] == "skills" && parts[2] == "SKILL.md")
+        {
+            return $"skills/{parts[1]}";
+        }
+
+        // For other assets, return top-level folder
         var separatorIndex = relativePath.IndexOfAny(['/', '\\']);
         return separatorIndex > 0 ? relativePath[..separatorIndex] : "";
+    }
+
+    /// <summary>
+    /// Get display name for a folder (extracts skill name for skills, friendly names for others).
+    /// </summary>
+    public static string GetFolderDisplayName(string folder)
+    {
+        if (folder.StartsWith("skills/"))
+        {
+            var skillName = folder.Substring("skills/".Length);
+            return $"{skillName} skill";
+        }
+
+        // For instructions folder, keep it simple
+        if (folder == "instructions")
+        {
+            return "custom instructions";
+        }
+
+        return folder;
     }
 }
 
@@ -248,8 +279,7 @@ public sealed class SyncEngine
                 continue;
 
             var assetType = GetAssetType(template.RelativePath);
-            var fileName = Path.GetFileName(template.RelativePath);
-            var outputPath = copilotAdapter.GetOutputPath(assetType, fileName);
+            var outputPath = copilotAdapter.GetOutputPath(assetType, template.RelativePath);
 
             // Derive tracking path the same way SyncToTargets does
             var trackingPath = outputPath.StartsWith(".github/") || outputPath.StartsWith(".github\\")
@@ -460,7 +490,7 @@ public sealed class SyncEngine
             };
 
             var transformedContent = adapter.TransformContent(content, metadata);
-            var outputPath = adapter.GetOutputPath(assetType, fileName);
+            var outputPath = adapter.GetOutputPath(assetType, templateRelativePath);
             var targetFile = _fileSystem.CombinePath(targetDirectory, outputPath);
 
             // Ensure target directory exists
@@ -525,6 +555,9 @@ public sealed class SyncEngine
             return AssetType.Agent;
         if (relativePath.Contains("skills/") || relativePath.Contains("skills\\"))
             return AssetType.Skill;
+        if (relativePath.Contains("instructions/") || relativePath.Contains("instructions\\"))
+            return AssetType.Instruction;
+        // Default: root-level instruction files (copilot-instructions.md, etc.)
         return AssetType.Instruction;
     }
 

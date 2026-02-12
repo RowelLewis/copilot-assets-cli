@@ -14,8 +14,15 @@ public sealed class WindsurfOutputAdapter : IOutputAdapter
         return CopilotOutputAdapter.StripToolSpecificSections(markdownContent, "windsurf");
     }
 
-    public string GetOutputPath(AssetType type, string fileName)
+    public string GetOutputPath(AssetType type, string relativePath)
     {
+        var fileName = Path.GetFileName(relativePath);
+
+        // Handle instructions from folder - add to .windsurf/rules/
+        if (type == AssetType.Instruction && (relativePath.Contains("instructions/") || relativePath.Contains("instructions\\")))
+        {
+            return Path.Combine(".windsurf", "rules", Path.ChangeExtension(fileName, ".md"));
+        }
         // Windsurf uses a single .windsurfrules file for instructions
         // and .windsurf/rules/ for other assets
         return type switch

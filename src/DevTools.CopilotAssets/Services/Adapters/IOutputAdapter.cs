@@ -41,7 +41,7 @@ public interface IOutputAdapter
     /// <summary>
     /// Get the output file path relative to the project root.
     /// </summary>
-    string GetOutputPath(AssetType type, string fileName);
+    string GetOutputPath(AssetType type, string relativePath);
 
     /// <summary>
     /// Get all directories managed by this adapter (relative to project root).
