@@ -21,6 +21,7 @@ public sealed record PendingFile(
     /// <summary>
     /// Get the top-level folder or empty string for root files.
     /// For skills, returns the skill folder path (e.g., "skills/refactor").
+    /// For instructions, returns the full path (e.g., "instructions/coding-standards.md").
     /// </summary>
     public static string GetFolder(string relativePath)
     {
@@ -31,6 +32,12 @@ public sealed record PendingFile(
         if (parts.Length >= 3 && parts[0] == "skills" && parts[2] == "SKILL.md")
         {
             return $"skills/{parts[1]}";
+        }
+
+        // For instructions, group by individual instruction file (e.g., "instructions/coding-standards.md")
+        if (parts.Length >= 2 && parts[0] == "instructions")
+        {
+            return normalized;
         }
 
         // For other assets, return top-level folder
@@ -49,10 +56,20 @@ public sealed record PendingFile(
             return $"{skillName} skill";
         }
 
-        // For instructions folder, keep it simple
-        if (folder == "instructions")
+        // For instructions folder, extract and format the instruction name
+        if (folder.StartsWith("instructions/"))
         {
-            return "custom instructions";
+            var fileName = Path.GetFileNameWithoutExtension(folder);
+            // Remove .instructions suffix if present (e.g., "coding-standards.instructions.md" -> "coding-standards")
+            if (fileName.EndsWith(".instructions"))
+            {
+                fileName = fileName.Substring(0, fileName.Length - ".instructions".Length);
+            }
+            // Convert kebab-case to title case (e.g., "coding-standards" -> "Coding Standards")
+            var words = fileName.Split('-', '_');
+            var titleCase = string.Join(" ", words.Select(w => 
+                char.ToUpper(w[0]) + w.Substring(1)));
+            return $"{titleCase} Instructions";
         }
 
         return folder;

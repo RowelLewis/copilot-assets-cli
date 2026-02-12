@@ -1,3 +1,7 @@
+---
+applyTo: "**/*.cs,**/*.ts,**/*.js,**/*.py"
+---
+
 # Coding Standards
 
 Follow these coding standards when working on this project:

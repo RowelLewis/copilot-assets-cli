@@ -1,3 +1,7 @@
+---
+applyTo: "**"
+---
+
 # Security Practices
 
 Always follow these security practices:

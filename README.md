@@ -177,6 +177,36 @@ Summary: 4 to install, 0 skipped
 copilot-assets init --dry-run
 ```
 
+### Path-Specific Custom Instructions
+
+The `.github/instructions/` folder supports organizing multiple instruction files for different parts of your codebase. Each instruction file can include YAML frontmatter with glob patterns to specify which files they apply to.
+
+**Example:** `coding-standards.md`
+```yaml
+---
+applyTo: "**/*.cs,**/*.ts,**/*.js,**/*.py"
+---
+
+# Coding Standards
+
+Follow these coding standards when working on this project:
+- Use clear, descriptive variable and function names
+- Keep functions small and focused
+- Add comments for complex logic
+```
+
+**Interactive Mode Display:**
+- Instructions are grouped by file (e.g., "Coding Standards Instructions", "Security Practices Instructions")
+- Each instruction file can be selected individually
+- Displayed with friendly title-cased names derived from filenames
+
+**Supported by:**
+- GitHub Copilot (`.github/instructions/`)
+- Claude Code (`.claude/instructions/`)
+- Cursor (`.cursor/rules/*.mdc`)
+
+When using `--target` with multiple tools, instruction files are adapted to each tool's native format while preserving the frontmatter and content.
+
 ### Update to Latest Version
 
 ```bash
