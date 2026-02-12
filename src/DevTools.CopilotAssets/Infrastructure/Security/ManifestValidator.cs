@@ -26,17 +26,15 @@ public static class ManifestValidator
         {
             try
             {
-                // Sanitize path - will throw if invalid
-                var sanitized = InputValidator.SanitizePath(assetPath);
-
-                // Ensure path is within .github directory (allow both with and without prefix)
-                var normalized = sanitized.Replace("\\", "/");
-                if (!InputValidator.IsWithinGitHubDirectory($".github/{normalized}") &&
-                    !InputValidator.IsWithinGitHubDirectory(normalized))
+                // Multi-target tracking paths use "target:path" format
+                var pathToValidate = assetPath;
+                if (IsMultiTargetPath(assetPath))
                 {
-                    throw new SecurityException(
-                        $"Asset path must be within .github directory: {assetPath}");
+                    pathToValidate = assetPath[(assetPath.IndexOf(':') + 1)..];
                 }
+
+                // Sanitize path - will throw if invalid (path traversal, absolute, etc.)
+                InputValidator.SanitizePath(pathToValidate);
             }
             catch (SecurityException)
             {
@@ -62,6 +60,19 @@ public static class ManifestValidator
                 throw new SecurityException($"Invalid checksum format for asset '{path}': {checksum}");
             }
         }
+    }
+
+    /// <summary>
+    /// Check if the path is a multi-target tracking path (e.g., "claude:CLAUDE.md").
+    /// </summary>
+    private static bool IsMultiTargetPath(string path)
+    {
+        var colonIdx = path.IndexOf(':');
+        if (colonIdx <= 0) return false;
+
+        var prefix = path[..colonIdx];
+        var knownTargets = new[] { "copilot", "claude", "cursor", "windsurf", "cline", "aider" };
+        return knownTargets.Contains(prefix, StringComparer.OrdinalIgnoreCase);
     }
 
     private static bool IsHexString(string str)

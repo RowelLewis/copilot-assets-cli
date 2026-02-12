@@ -40,6 +40,10 @@ public sealed class UpdateCommand : BaseCommand
             "--exclude",
             "Exclude specified asset types (comma-separated: instruction,prompts,agents,skills)");
 
+        var targetToolOption = new Option<string?>(
+            ["-t", "--target"],
+            "Target AI tools (comma-separated: copilot,claude,cursor,windsurf,cline,aider). Default: copilot");
+
         var pathArgument = new Argument<string>(
             "path",
             () => ".",
@@ -54,6 +58,7 @@ public sealed class UpdateCommand : BaseCommand
             sourceOption,
             onlyOption,
             excludeOption,
+            targetToolOption,
             pathArgument
         };
 
@@ -66,6 +71,7 @@ public sealed class UpdateCommand : BaseCommand
             var source = ctx.ParseResult.GetValueForOption(sourceOption);
             var only = ctx.ParseResult.GetValueForOption(onlyOption);
             var exclude = ctx.ParseResult.GetValueForOption(excludeOption);
+            var targetTool = ctx.ParseResult.GetValueForOption(targetToolOption);
             var path = ctx.ParseResult.GetValueForArgument(pathArgument);
             var json = ctx.ParseResult.GetValueForOption(globalJsonOption);
             JsonMode = json;
@@ -125,6 +131,23 @@ public sealed class UpdateCommand : BaseCommand
                 filter = parseResult.Filter;
             }
 
+            // Parse target tools
+            List<TargetTool>? targets = null;
+            if (!string.IsNullOrEmpty(targetTool))
+            {
+                var (success, parsedTargets, targetError) = TargetToolExtensions.ParseTargets(targetTool);
+                if (!success)
+                {
+                    if (json)
+                        WriteJson("update", new { }, 1, [targetError!]);
+                    else
+                        WriteError(targetError!);
+                    Environment.ExitCode = 1;
+                    return;
+                }
+                targets = parsedTargets;
+            }
+
             var options = new UpdateOptions
             {
                 TargetDirectory = path,
@@ -132,7 +155,8 @@ public sealed class UpdateCommand : BaseCommand
                 NoGit = noGit,
                 Filter = filter,
                 SourceOverride = sourceSelection.SourceOverride,
-                UseDefaultTemplates = sourceSelection.UseDefault
+                UseDefaultTemplates = sourceSelection.UseDefault,
+                Targets = targets
             };
 
             // Dry run mode

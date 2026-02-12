@@ -63,7 +63,7 @@ public class PolicyAppServiceTests
         _mockFileSystem.Setup(f => f.ReadAllText(It.Is<string>(s => s.Contains(".copilot-assets.json"))))
             .Returns(manifest.ToJson());
         _mockFileSystem.Setup(f => f.GetFiles(It.IsAny<string>(), "*", true)).Returns([]);
-        _mockFileSystem.Setup(f => f.ComputeChecksum(It.IsAny<string>())).Returns("hash");
+        _mockFileSystem.Setup(f => f.ComputeChecksum(It.IsAny<string>())).Returns("a1b2c3d4e5f60000000000000000000000000000000000000000000000000001");
         _mockGit.Setup(g => g.IsRepository(It.IsAny<string>())).Returns(false);
 
         var options = new InitOptions { TargetDirectory = ".", Force = true, NoGit = true };
@@ -85,7 +85,7 @@ public class PolicyAppServiceTests
         _mockFileSystem.Setup(f => f.Exists(It.Is<string>(s => s.Contains("templates")))).Returns(true);
         _mockFileSystem.Setup(f => f.Exists(It.Is<string>(s => !s.Contains("templates")))).Returns(false);
         _mockFileSystem.Setup(f => f.GetFiles(It.IsAny<string>(), "*", true)).Returns([]);
-        _mockFileSystem.Setup(f => f.ComputeChecksum(It.IsAny<string>())).Returns("hash");
+        _mockFileSystem.Setup(f => f.ComputeChecksum(It.IsAny<string>())).Returns("a1b2c3d4e5f60000000000000000000000000000000000000000000000000001");
         _mockGit.Setup(g => g.IsRepository(It.IsAny<string>())).Returns(true);
 
         var options = new InitOptions { TargetDirectory = ".", NoGit = false };
@@ -107,7 +107,7 @@ public class PolicyAppServiceTests
         _mockFileSystem.Setup(f => f.Exists(It.Is<string>(s => s.Contains("templates")))).Returns(true);
         _mockFileSystem.Setup(f => f.Exists(It.Is<string>(s => !s.Contains("templates")))).Returns(false);
         _mockFileSystem.Setup(f => f.GetFiles(It.IsAny<string>(), "*", true)).Returns([]);
-        _mockFileSystem.Setup(f => f.ComputeChecksum(It.IsAny<string>())).Returns("hash");
+        _mockFileSystem.Setup(f => f.ComputeChecksum(It.IsAny<string>())).Returns("a1b2c3d4e5f60000000000000000000000000000000000000000000000000001");
 
         var options = new InitOptions { TargetDirectory = ".", NoGit = true };
 
@@ -225,7 +225,7 @@ public class PolicyAppServiceTests
         var manifest = CreateTestManifest();
         manifest.Assets.Add("prompts/test.md");
         manifest.Assets.Add(".copilot-assets.json");
-        manifest.Checksums["prompts/test.md"] = "checksum123";
+        manifest.Checksums["prompts/test.md"] = "a1b2c3d4e5f60000000000000000000000000000000000000000000000000001";
 
         _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
         _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
@@ -237,7 +237,7 @@ public class PolicyAppServiceTests
         _mockFileSystem.Setup(f => f.ReadAllText(It.Is<string>(s => s.Contains(".copilot-assets.json"))))
             .Returns(manifest.ToJson());
         _mockFileSystem.Setup(f => f.ComputeChecksum(It.Is<string>(s => s.Contains("test.md"))))
-            .Returns("checksum123");
+            .Returns("a1b2c3d4e5f60000000000000000000000000000000000000000000000000001");
 
         var options = new ListOptions { TargetDirectory = "." };
 
@@ -259,8 +259,8 @@ public class PolicyAppServiceTests
         manifest.Assets.Add("prompts/test.md");
         manifest.Assets.Add("agents/agent.md");
         manifest.Assets.Add(".copilot-assets.json");
-        manifest.Checksums["prompts/test.md"] = "checksum1";
-        manifest.Checksums["agents/agent.md"] = "checksum2";
+        manifest.Checksums["prompts/test.md"] = "a1b2c3d4e5f60000000000000000000000000000000000000000000000000001";
+        manifest.Checksums["agents/agent.md"] = "b2c3d4e5f6a10000000000000000000000000000000000000000000000000002";
 
         _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
         _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
@@ -268,7 +268,7 @@ public class PolicyAppServiceTests
         _mockFileSystem.Setup(f => f.Exists(It.IsAny<string>())).Returns(true);
         _mockFileSystem.Setup(f => f.ReadAllText(It.Is<string>(s => s.Contains(".copilot-assets.json"))))
             .Returns(manifest.ToJson());
-        _mockFileSystem.Setup(f => f.ComputeChecksum(It.IsAny<string>())).Returns("checksum1");
+        _mockFileSystem.Setup(f => f.ComputeChecksum(It.IsAny<string>())).Returns("a1b2c3d4e5f60000000000000000000000000000000000000000000000000001");
 
         var filter = AssetTypeFilter.ParseOnly("prompts").Filter;
         var options = new ListOptions { TargetDirectory = ".", Filter = filter };
@@ -307,7 +307,7 @@ public class PolicyAppServiceTests
         var manifest = CreateTestManifest();
         manifest.Assets.Add("prompts/test.md");
         manifest.Assets.Add(".copilot-assets.json");
-        manifest.Checksums["prompts/test.md"] = "checksum123";
+        manifest.Checksums["prompts/test.md"] = "a1b2c3d4e5f60000000000000000000000000000000000000000000000000001";
 
         _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
         _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
@@ -316,7 +316,7 @@ public class PolicyAppServiceTests
         _mockFileSystem.Setup(f => f.ReadAllText(It.Is<string>(s => s.Contains(".copilot-assets.json"))))
             .Returns(manifest.ToJson());
         _mockFileSystem.Setup(f => f.ComputeChecksum(It.Is<string>(s => s.Contains("test.md"))))
-            .Returns("checksum123");
+            .Returns("a1b2c3d4e5f60000000000000000000000000000000000000000000000000001");
 
         var options = new VerifyOptions { TargetDirectory = "." };
 
@@ -336,7 +336,7 @@ public class PolicyAppServiceTests
         var manifest = CreateTestManifest();
         manifest.Assets.Add("prompts/test.md");
         manifest.Assets.Add(".copilot-assets.json");
-        manifest.Checksums["prompts/test.md"] = "original-checksum";
+        manifest.Checksums["prompts/test.md"] = "c3d4e5f6a1b20000000000000000000000000000000000000000000000000003";
 
         _mockFileSystem.Setup(f => f.GetFullPath(It.IsAny<string>())).Returns("/target");
         _mockFileSystem.Setup(f => f.CombinePath(It.IsAny<string[]>()))
@@ -345,7 +345,7 @@ public class PolicyAppServiceTests
         _mockFileSystem.Setup(f => f.ReadAllText(It.Is<string>(s => s.Contains(".copilot-assets.json"))))
             .Returns(manifest.ToJson());
         _mockFileSystem.Setup(f => f.ComputeChecksum(It.Is<string>(s => s.Contains("test.md"))))
-            .Returns("modified-checksum"); // Different checksum
+            .Returns("d4e5f6a1b2c30000000000000000000000000000000000000000000000000004"); // Different checksum
 
         var options = new VerifyOptions { TargetDirectory = "." };
 

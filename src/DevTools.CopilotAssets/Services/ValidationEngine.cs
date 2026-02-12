@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using DevTools.CopilotAssets.Domain;
+using DevTools.CopilotAssets.Services.Skills;
 
 namespace DevTools.CopilotAssets.Services;
 
@@ -90,6 +91,19 @@ public sealed class ValidationEngine
             else
             {
                 result.Errors.Add($"Missing asset: .github/{assetPath}");
+            }
+        }
+
+        // SKILL.md validation
+        var skillFiles = _fileSystem.GetFiles(gitHubPath, "SKILL.md", recursive: true);
+        foreach (var skillFile in skillFiles)
+        {
+            var skillContent = _fileSystem.ReadAllText(skillFile);
+            var skillRelativePath = Path.GetRelativePath(targetDirectory, skillFile);
+            var skillErrors = SkillParser.Validate(skillContent, skillRelativePath);
+            foreach (var error in skillErrors)
+            {
+                result.Warnings.Add(error);
             }
         }
 

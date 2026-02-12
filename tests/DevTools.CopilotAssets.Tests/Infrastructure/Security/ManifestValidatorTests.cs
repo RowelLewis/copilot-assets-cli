@@ -70,22 +70,22 @@ public class ManifestValidatorTests
     }
 
     [Fact]
-    public void Validate_WithPathOutsideGitHub_ShouldThrowSecurityException()
+    public void Validate_WithRelativePath_ShouldNotThrow()
     {
-        // Arrange
+        // Asset paths in the manifest are relative to .github/
+        // so any valid relative path is acceptable
         var manifest = new Manifest
         {
             InstalledAt = DateTime.UtcNow,
             ToolVersion = "1.3.0",
-            Assets = ["etc/passwd"]
+            Assets = ["prompts/test.md"]
         };
 
         // Act
         var act = () => ManifestValidator.Validate(manifest);
 
         // Assert
-        act.Should().Throw<SecurityException>()
-            .WithMessage("*within .github directory*");
+        act.Should().NotThrow();
     }
 
     [Theory]

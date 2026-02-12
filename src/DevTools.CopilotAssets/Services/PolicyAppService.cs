@@ -41,12 +41,13 @@ public sealed class PolicyAppService : IPolicyAppService
         // Determine source override
         string? sourceOverride = options.UseDefaultTemplates ? "default" : options.SourceOverride;
 
-        // Sync assets with optional filter and source
+        // Sync assets with optional filter, source, and targets
         var syncResult = await _syncEngine.SyncAssetsAsync(
             targetDir,
             options.Force,
             options.Filter,
-            sourceOverride);
+            sourceOverride,
+            options.Targets);
 
         if (!syncResult.Success)
         {
@@ -133,7 +134,7 @@ public sealed class PolicyAppService : IPolicyAppService
         }
 
         // Sync with force to update
-        var syncResult = await _syncEngine.SyncAssetsAsync(targetDir, force: true, options.Filter, sourceOverride);
+        var syncResult = await _syncEngine.SyncAssetsAsync(targetDir, force: true, options.Filter, sourceOverride, options.Targets);
 
         if (!syncResult.Success)
         {
@@ -293,7 +294,8 @@ public sealed class PolicyAppService : IPolicyAppService
             ProjectPath: targetDir,
             Assets: assets,
             Summary: new AssetSummary(assets.Count, valid, modified, missing),
-            Source: manifest.Source));
+            Source: manifest.Source,
+            Targets: manifest.Targets));
     }
 
     /// <inheritdoc />

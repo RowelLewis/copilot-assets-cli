@@ -39,4 +39,10 @@ public sealed record InitOptions
     /// even if a remote source is configured.
     /// </summary>
     public bool UseDefaultTemplates { get; init; }
+
+    /// <summary>
+    /// Target AI tools to generate output for.
+    /// Defaults to Copilot only for backward compatibility.
+    /// </summary>
+    public IReadOnlyList<TargetTool>? Targets { get; init; }
 }

@@ -24,15 +24,15 @@ public class TokenRedactorTests
     [Fact]
     public void RedactSensitiveData_WithMultipleTokens_ShouldMaskAll()
     {
-        // Arrange
-        var input = "ghp_token123 and Bearer xyz789 and api_key=secret123";
+        // Arrange - ghp_ tokens require 16+ chars after prefix
+        var input = "ghp_1234567890abcdefghij and Bearer xyz789 and api_key=secret123";
 
         // Act
         var result = TokenRedactor.RedactSensitiveData(input);
 
         // Assert
         result.Should().Contain("[REDACTED");
-        result.Should().NotContain("ghp_token123");
+        result.Should().NotContain("ghp_1234567890abcdefghij");
         result.Should().NotContain("xyz789");
         result.Should().NotContain("secret123");
     }

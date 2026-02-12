@@ -52,7 +52,7 @@ public class ManifestTests
         var json = manifest.ToJson();
 
         // Assert
-        json.Should().Contain("\"schemaVersion\": 2");
+        json.Should().Contain("\"schemaVersion\": 3");
         json.Should().Contain("\"toolVersion\": \"1.0.0.0\"");
         json.Should().Contain("\"copilot-instructions.md\"");
         json.Should().Contain("\"prompts/test.md\"");

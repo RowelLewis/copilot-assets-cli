@@ -97,7 +97,6 @@ public class InputValidatorTests
     [Theory]
     [InlineData("copilot-instructions.md", "copilot-instructions.md")]
     [InlineData("prompts/test.md", "prompts/test.md")]
-    [InlineData("/leading/slash.md", "leading/slash.md")]
     public void SanitizePath_WithValidPath_ShouldReturnSanitized(string input, string expected)
     {
         // Act

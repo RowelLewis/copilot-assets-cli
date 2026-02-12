@@ -3,7 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using DevTools.CopilotAssets.Commands;
 using DevTools.CopilotAssets.Domain.Configuration;
 using DevTools.CopilotAssets.Services;
+using DevTools.CopilotAssets.Services.Adapters;
+using DevTools.CopilotAssets.Services.Fleet;
 using DevTools.CopilotAssets.Services.Http;
+using DevTools.CopilotAssets.Services.Registry;
 using DevTools.CopilotAssets.Services.Templates;
 
 namespace DevTools.CopilotAssets;
@@ -44,6 +47,16 @@ public static class Program
         services.AddSingleton<BundledTemplateProvider>();
         services.AddSingleton<TemplateProviderFactory>();
 
+        // Output adapters
+        services.AddSingleton<OutputAdapterFactory>();
+
+        // Registry
+        services.AddSingleton<RegistryClient>();
+
+        // Fleet management
+        services.AddSingleton<FleetManager>();
+        services.AddSingleton<FleetSyncService>();
+
         // Application services - use factory for dynamic source selection
         services.AddSingleton<SyncEngine>(sp => new SyncEngine(
             sp.GetRequiredService<IFileSystemService>(),
@@ -61,6 +74,9 @@ public static class Program
     private static RootCommand BuildRootCommand(IServiceProvider services)
     {
         var policyService = services.GetRequiredService<IPolicyAppService>();
+        var registryClient = services.GetRequiredService<RegistryClient>();
+        var fleetManager = services.GetRequiredService<FleetManager>();
+        var fleetSyncService = services.GetRequiredService<FleetSyncService>();
 
         // Global --json option
         var jsonOption = new Option<bool>(
@@ -76,6 +92,8 @@ public static class Program
             VerifyCommand.Create(policyService, jsonOption),
             DoctorCommand.Create(policyService, jsonOption),
             ConfigCommand.Create(jsonOption),
+            RegistryCommand.Create(registryClient, jsonOption),
+            FleetCommand.Create(fleetManager, fleetSyncService, jsonOption),
             VersionCommand.Create(jsonOption)
         };
 

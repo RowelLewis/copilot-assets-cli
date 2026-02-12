@@ -77,26 +77,25 @@ public static class InputValidator
         if (string.IsNullOrWhiteSpace(remotePath))
             throw new SecurityException("Path cannot be empty");
 
-        // Remove leading slashes and trim
-        var path = remotePath.Trim().TrimStart('/', '\\');
+        var trimmed = remotePath.Trim();
 
-        // Empty after trimming
-        if (string.IsNullOrEmpty(path))
-            throw new SecurityException("Path cannot be empty after sanitization");
-
-        // Check for path traversal attempts
-        if (path.Contains(".."))
-            throw new SecurityException($"Path traversal detected: {remotePath}");
-
-        // No backslashes (normalize to forward slashes)
-        if (path.Contains("\\"))
-            throw new SecurityException($"Invalid path separator: {remotePath}");
-
-        // Ensure path is relative and safe
-        if (Path.IsPathRooted(path))
+        // Check for absolute paths BEFORE trimming leading slashes
+        if (Path.IsPathRooted(trimmed) || trimmed.StartsWith('/') || trimmed.StartsWith('\\'))
             throw new SecurityException($"Absolute paths not allowed: {remotePath}");
 
-        return path;
+        // Check for path traversal attempts
+        if (trimmed.Contains(".."))
+            throw new SecurityException($"Path traversal detected: {remotePath}");
+
+        // No backslashes
+        if (trimmed.Contains('\\'))
+            throw new SecurityException($"Invalid path separator: {remotePath}");
+
+        // Empty after trimming
+        if (string.IsNullOrEmpty(trimmed))
+            throw new SecurityException("Path cannot be empty after sanitization");
+
+        return trimmed;
     }
 
     /// <summary>

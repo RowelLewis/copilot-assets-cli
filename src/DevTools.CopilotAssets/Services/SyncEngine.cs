@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using DevTools.CopilotAssets.Domain;
 using DevTools.CopilotAssets.Infrastructure.Security;
+using DevTools.CopilotAssets.Services.Adapters;
 using DevTools.CopilotAssets.Services.Results;
 using DevTools.CopilotAssets.Services.Templates;
 
@@ -46,6 +47,7 @@ public sealed class SyncEngine
     private readonly IGitService _git;
     private readonly ITemplateProvider? _templateProvider;
     private readonly TemplateProviderFactory? _providerFactory;
+    private readonly OutputAdapterFactory _adapterFactory;
 
     // Tool version from assembly
     public static string ToolVersion =>
@@ -60,6 +62,7 @@ public sealed class SyncEngine
     {
         _fileSystem = fileSystem;
         _git = git;
+        _adapterFactory = new OutputAdapterFactory();
     }
 
     public SyncEngine(IFileSystemService fileSystem, IGitService git, ITemplateProvider templateProvider)
@@ -87,11 +90,12 @@ public sealed class SyncEngine
     /// <summary>
     /// Sync all assets to the target directory.
     /// </summary>
-    public SyncResult SyncAssets(string targetDirectory, bool force = false, AssetTypeFilter? filter = null)
+    public SyncResult SyncAssets(string targetDirectory, bool force = false, AssetTypeFilter? filter = null, IReadOnlyList<TargetTool>? targets = null)
     {
         var result = new SyncResult();
         var templatesPath = GetTemplatesPath();
         var targetGitHubPath = _fileSystem.CombinePath(targetDirectory, ".github");
+        var effectiveTargets = targets ?? [TargetTool.Copilot];
 
         if (!_fileSystem.Exists(templatesPath))
         {
@@ -99,7 +103,7 @@ public sealed class SyncEngine
             return result;
         }
 
-        // Create .github directory if it doesn't exist
+        // Create .github directory if it doesn't exist (always needed for manifest)
         _fileSystem.CreateDirectory(targetGitHubPath);
 
         // Sync all files from templates
@@ -116,43 +120,16 @@ public sealed class SyncEngine
                 continue;
             }
 
-            var targetFile = _fileSystem.CombinePath(targetGitHubPath, relativePath);
+            var content = _fileSystem.ReadAllText(templateFile);
+            var assetType = GetAssetType(relativePath);
+            var fileName = Path.GetFileName(relativePath);
 
-            var exists = _fileSystem.Exists(targetFile);
-
-            if (exists && !force)
-            {
-                // Check if content is different
-                var sourceChecksum = _fileSystem.ComputeChecksum(templateFile);
-                var targetChecksum = _fileSystem.ComputeChecksum(targetFile);
-
-                if (sourceChecksum != targetChecksum)
-                {
-                    result.Skipped.Add(relativePath);
-                    result.Warnings.Add($"File exists with different content (use --force to overwrite): {relativePath}");
-                }
-                else
-                {
-                    result.Unchanged.Add(relativePath);
-                }
-            }
-            else
-            {
-                _fileSystem.CopyFile(templateFile, targetFile, overwrite: force);
-                var checksum = _fileSystem.ComputeChecksum(targetFile);
-
-                result.Synced.Add(new SyncedAsset
-                {
-                    RelativePath = relativePath,
-                    FullPath = targetFile,
-                    Checksum = checksum,
-                    WasUpdated = exists
-                });
-            }
+            // Sync to each target tool
+            SyncToTargets(targetDirectory, relativePath, content, assetType, fileName, force, effectiveTargets, result);
         }
 
         // Write manifest (default source for synchronous path)
-        WriteManifest(targetDirectory, result, "default");
+        WriteManifest(targetDirectory, result, "default", effectiveTargets);
 
         return result;
     }
@@ -160,13 +137,13 @@ public sealed class SyncEngine
     /// <summary>
     /// Write the manifest file tracking installed assets.
     /// </summary>
-    private void WriteManifest(string targetDirectory, SyncResult syncResult, string? sourceString = null)
+    private void WriteManifest(string targetDirectory, SyncResult syncResult, string? sourceString = null, IReadOnlyList<TargetTool>? targets = null)
     {
         var source = sourceString != null
             ? TemplateSource.Parse(sourceString)
             : TemplateSource.Default();
 
-        var manifest = Manifest.Create(ToolVersion, source);
+        var manifest = Manifest.Create(ToolVersion, source, targets);
 
         foreach (var synced in syncResult.Synced)
         {
@@ -209,7 +186,7 @@ public sealed class SyncEngine
 
         var json = _fileSystem.ReadAllText(manifestPath);
         var manifest = Manifest.FromJson(json);
-        
+
         // Validate manifest for security issues
         if (manifest != null)
         {
@@ -224,7 +201,7 @@ public sealed class SyncEngine
                 return null;
             }
         }
-        
+
         return manifest;
     }
 
@@ -260,37 +237,54 @@ public sealed class SyncEngine
             return result;
         }
 
+        // Build a mapping from template paths to their tracking paths (as stored in manifest)
+        var copilotAdapter = _adapterFactory.CreateAdapter(TargetTool.Copilot);
+        var templateToTrackingPath = new Dictionary<string, string>();
+
         // Compare each template against installed checksums
         foreach (var template in templateResult.Templates)
         {
             if (filter != null && !filter.ShouldIncludePath(template.RelativePath))
                 continue;
 
+            var assetType = GetAssetType(template.RelativePath);
+            var fileName = Path.GetFileName(template.RelativePath);
+            var outputPath = copilotAdapter.GetOutputPath(assetType, fileName);
+
+            // Derive tracking path the same way SyncToTargets does
+            var trackingPath = outputPath.StartsWith(".github/") || outputPath.StartsWith(".github\\")
+                ? outputPath[".github/".Length..]
+                : outputPath.StartsWith($".github{Path.DirectorySeparatorChar}")
+                    ? outputPath[(".github" + Path.DirectorySeparatorChar).Length..]
+                    : template.RelativePath;
+
+            templateToTrackingPath[template.RelativePath] = trackingPath;
+
             var newChecksum = ComputeChecksum(template.Content);
-            var installedChecksum = manifest.Checksums.GetValueOrDefault(template.RelativePath);
+            var installedChecksum = manifest.Checksums.GetValueOrDefault(trackingPath);
 
             if (installedChecksum == null)
             {
-                result.Added.Add(template.RelativePath);
+                result.Added.Add(trackingPath);
             }
             else if (installedChecksum != newChecksum)
             {
-                result.Modified.Add(template.RelativePath);
+                result.Modified.Add(trackingPath);
             }
             else
             {
-                result.Unchanged.Add(template.RelativePath);
+                result.Unchanged.Add(trackingPath);
             }
         }
 
         // Check for removed files
-        var templatePaths = templateResult.Templates.Select(t => t.RelativePath).ToHashSet();
+        var trackingPaths = templateToTrackingPath.Values.ToHashSet();
         foreach (var asset in manifest.Assets.Where(a => a != Manifest.FileName))
         {
             if (filter != null && !filter.ShouldIncludePath(asset))
                 continue;
 
-            if (!templatePaths.Contains(asset))
+            if (!trackingPaths.Contains(asset))
             {
                 result.Removed.Add(asset);
             }
@@ -370,24 +364,21 @@ public sealed class SyncEngine
     /// Sync assets using the configured template provider.
     /// Falls back to bundled templates if no provider is configured.
     /// </summary>
-    /// <param name="targetDirectory">Target directory for assets</param>
-    /// <param name="force">Overwrite existing files</param>
-    /// <param name="filter">Optional asset type filter</param>
-    /// <param name="sourceOverride">Optional source override (e.g., "default" or "owner/repo[@branch]")</param>
-    /// <param name="ct">Cancellation token</param>
     public async Task<SyncResult> SyncAssetsAsync(
         string targetDirectory,
         bool force = false,
         AssetTypeFilter? filter = null,
         string? sourceOverride = null,
+        IReadOnlyList<TargetTool>? targets = null,
         CancellationToken ct = default)
     {
         var provider = GetProvider(sourceOverride);
+        var effectiveTargets = targets ?? [TargetTool.Copilot];
 
         // If no template provider, use the synchronous bundled path
         if (provider == null)
         {
-            return SyncAssets(targetDirectory, force, filter);
+            return SyncAssets(targetDirectory, force, filter, effectiveTargets);
         }
 
         var result = new SyncResult();
@@ -415,7 +406,7 @@ public sealed class SyncEngine
             result.Warnings.Add(templateResult.Error!);
         }
 
-        // Create .github directory if it doesn't exist
+        // Create .github directory if it doesn't exist (always needed for manifest)
         _fileSystem.CreateDirectory(targetGitHubPath);
 
         foreach (var template in templateResult.Templates)
@@ -431,7 +422,48 @@ public sealed class SyncEngine
                 continue;
             }
 
-            var targetFile = template.GetTargetPath(targetGitHubPath);
+            var assetType = GetAssetType(relativePath);
+            var fileName = Path.GetFileName(relativePath);
+
+            // Sync to each target tool
+            SyncToTargets(targetDirectory, relativePath, template.Content, assetType, fileName, force, effectiveTargets, result);
+        }
+
+        // Write manifest with source from template provider
+        WriteManifest(targetDirectory, result, templateResult.Source, effectiveTargets);
+
+        return result;
+    }
+
+    /// <summary>
+    /// Sync a single template to all target tools.
+    /// </summary>
+    private void SyncToTargets(
+        string targetDirectory,
+        string templateRelativePath,
+        string content,
+        AssetType assetType,
+        string fileName,
+        bool force,
+        IReadOnlyList<TargetTool> targets,
+        SyncResult result)
+    {
+        var adapters = _adapterFactory.CreateAdapters(targets);
+
+        foreach (var adapter in adapters)
+        {
+            var metadata = new AssetMetadata
+            {
+                FileName = fileName,
+                RelativePath = templateRelativePath,
+                Type = assetType
+            };
+
+            var transformedContent = adapter.TransformContent(content, metadata);
+            var outputPath = adapter.GetOutputPath(assetType, fileName);
+            var targetFile = _fileSystem.CombinePath(targetDirectory, outputPath);
+
+            // Ensure target directory exists
             var targetDir = Path.GetDirectoryName(targetFile);
             if (!string.IsNullOrEmpty(targetDir))
             {
@@ -440,41 +472,60 @@ public sealed class SyncEngine
 
             var exists = _fileSystem.Exists(targetFile);
 
+            // Use a combined key for tracking: "target:outputPath" for non-Copilot,
+            // outputPath (relative to .github/) for Copilot
+            var copilotPath = outputPath.StartsWith(".github/") || outputPath.StartsWith(".github\\")
+                ? outputPath[".github/".Length..]
+                : outputPath.StartsWith($".github{Path.DirectorySeparatorChar}")
+                    ? outputPath[(".github" + Path.DirectorySeparatorChar).Length..]
+                    : templateRelativePath;
+            var trackingPath = adapter.Target == TargetTool.Copilot
+                ? copilotPath
+                : $"{adapter.Target.ToConfigName()}:{outputPath}";
+
             if (exists && !force)
             {
-                // Check if content is different
-                var sourceChecksum = ComputeChecksum(template.Content);
+                var sourceChecksum = ComputeChecksum(transformedContent);
                 var targetChecksum = _fileSystem.ComputeChecksum(targetFile);
 
                 if (sourceChecksum != targetChecksum)
                 {
-                    result.Skipped.Add(relativePath);
-                    result.Warnings.Add($"File exists with different content (use --force to overwrite): {relativePath}");
+                    result.Skipped.Add(trackingPath);
+                    result.Warnings.Add($"File exists with different content (use --force to overwrite): {outputPath}");
                 }
                 else
                 {
-                    result.Unchanged.Add(relativePath);
+                    result.Unchanged.Add(trackingPath);
                 }
             }
             else
             {
-                _fileSystem.WriteAllText(targetFile, template.Content);
-                var checksum = _fileSystem.ComputeChecksum(targetFile);
+                _fileSystem.WriteAllText(targetFile, transformedContent);
+                var checksum = ComputeChecksum(transformedContent);
 
                 result.Synced.Add(new SyncedAsset
                 {
-                    RelativePath = relativePath,
+                    RelativePath = trackingPath,
                     FullPath = targetFile,
                     Checksum = checksum,
                     WasUpdated = exists
                 });
             }
         }
+    }
 
-        // Write manifest with source from template provider
-        WriteManifest(targetDirectory, result, templateResult.Source);
-
-        return result;
+    /// <summary>
+    /// Determine the AssetType from a relative path.
+    /// </summary>
+    private static AssetType GetAssetType(string relativePath)
+    {
+        if (relativePath.Contains("prompts/") || relativePath.Contains("prompts\\"))
+            return AssetType.Prompt;
+        if (relativePath.Contains("agents/") || relativePath.Contains("agents\\"))
+            return AssetType.Agent;
+        if (relativePath.Contains("skills/") || relativePath.Contains("skills\\"))
+            return AssetType.Skill;
+        return AssetType.Instruction;
     }
 
     /// <summary>
@@ -496,7 +547,7 @@ public sealed class SyncEngine
     /// <summary>
     /// Compute checksum of content string.
     /// </summary>
-    private static string ComputeChecksum(string content)
+    internal static string ComputeChecksum(string content)
     {
         var bytes = Encoding.UTF8.GetBytes(content);
         var hash = SHA256.HashData(bytes);
@@ -580,9 +631,11 @@ public sealed class SyncEngine
     public SyncResult ExecuteSelective(
         string targetDirectory,
         IEnumerable<PendingFile> selectedFiles,
-        string? sourceString = null)
+        string? sourceString = null,
+        IReadOnlyList<TargetTool>? targets = null)
     {
         var result = new SyncResult();
+        var effectiveTargets = targets ?? [TargetTool.Copilot];
         var targetGitHubPath = _fileSystem.CombinePath(targetDirectory, ".github");
 
         // Create .github directory if it doesn't exist
@@ -590,29 +643,14 @@ public sealed class SyncEngine
 
         foreach (var file in selectedFiles)
         {
-            var targetFile = _fileSystem.CombinePath(targetGitHubPath, file.RelativePath);
-            var targetDir = Path.GetDirectoryName(targetFile);
-            if (!string.IsNullOrEmpty(targetDir))
-            {
-                _fileSystem.CreateDirectory(targetDir);
-            }
+            var assetType = GetAssetType(file.RelativePath);
+            var fileName = Path.GetFileName(file.RelativePath);
 
-            var exists = _fileSystem.Exists(targetFile);
-
-            _fileSystem.WriteAllText(targetFile, file.Content);
-            var checksum = _fileSystem.ComputeChecksum(targetFile);
-
-            result.Synced.Add(new SyncedAsset
-            {
-                RelativePath = file.RelativePath,
-                FullPath = targetFile,
-                Checksum = checksum,
-                WasUpdated = exists
-            });
+            SyncToTargets(targetDirectory, file.RelativePath, file.Content, assetType, fileName, true, effectiveTargets, result);
         }
 
         // Write manifest
-        WriteManifest(targetDirectory, result, sourceString ?? "default");
+        WriteManifest(targetDirectory, result, sourceString ?? "default", effectiveTargets);
 
         return result;
     }
