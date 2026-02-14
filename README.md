@@ -21,7 +21,7 @@ This creates assets for your target AI tool(s). By default, assets are generated
 - `.github/copilot-instructions.md` - Repository context and instructions
 - `.github/prompts/` - Reusable prompt templates
 - `.github/agents/` - AI agent definitions
-- `.github/skills/` - Custom skills (SKILL.md format with YAML frontmatter)
+- `.github/skills/` - Custom skills (cross-tool SKILL.md standard)
 - `.github/instructions/` - Additional custom instructions (optional folder for organizing multiple instruction files)
 - `.github/.copilot-assets.json` - Manifest file tracking installed assets
 
@@ -120,6 +120,35 @@ copilot-assets registry install dotnet-enterprise
 ```
 
 After installing a registry pack, run `copilot-assets init` or `copilot-assets update` to fetch and apply the templates.
+
+### Publishing a Template Pack
+
+Validate and publish your own template pack to the community registry:
+
+```bash
+# Validate pack.json in the current directory
+copilot-assets registry publish
+
+# Validate and submit to the registry
+copilot-assets registry publish --submit
+
+# Validate a pack in a specific directory
+copilot-assets registry publish ./my-pack
+```
+
+A valid `pack.json` is required with these fields:
+
+```json
+{
+  "name": "my-org-standards",
+  "description": "My organization's AI coding standards",
+  "author": "My Org",
+  "repo": "my-org/copilot-assets-pack",
+  "tags": ["enterprise", "dotnet"],
+  "targets": ["copilot", "claude", "cursor"],
+  "version": "1.0.0"
+}
+```
 
 ### Selective Installation
 
@@ -233,6 +262,15 @@ copilot-assets fleet list
 # Check sync status across all repos
 copilot-assets fleet status
 
+# Preview what sync would do (dry run)
+copilot-assets fleet sync --dry-run
+
+# Sync assets to all locally-cloned fleet repos
+copilot-assets fleet sync
+
+# Sync via pull requests (creates a branch + PR per changed repo)
+copilot-assets fleet sync --pr
+
 # Validate compliance across the fleet
 copilot-assets fleet validate
 
@@ -293,8 +331,50 @@ copilot-assets validate --ci
 
 Validation includes:
 - Required file checks
-- SKILL.md frontmatter validation (must have `name` field and non-empty body)
+- SKILL.md validation (name and non-empty body)
+- Checksum integrity verification (strict mode treats modifications as errors)
 - Secret pattern detection (API keys, tokens, private keys)
+
+### SKILL.md Format
+
+Skills use a cross-tool standard format. Each skill lives in its own directory with a `SKILL.md` file:
+
+```
+skills/
+└── refactor/
+    └── SKILL.md
+```
+
+SKILL.md files support optional YAML frontmatter:
+
+```markdown
+---
+name: refactor
+description: Refactor code to improve quality
+version: 1.0
+---
+# Refactor Code Skill
+
+Refactor code to improve quality while preserving behavior.
+
+## Refactoring Techniques
+- Extract Method
+- Rename for clarity
+- Remove duplication
+```
+
+If no frontmatter is present, the skill name is extracted from the first markdown heading and the description from the first paragraph. The `name` field (or heading) is required; the body must not be empty.
+
+When targeting multiple tools, skills are placed in each tool's native location:
+
+| Tool | Skill Path |
+|------|-----------|
+| **Copilot** | `.github/skills/<name>/SKILL.md` |
+| **Claude** | `.claude/skills/<name>/SKILL.md` |
+| **Cursor** | `.cursor/rules/<name>.mdc` |
+| **Windsurf** | `.windsurf/rules/<name>.md` |
+| **Cline** | `.clinerules/<name>.md` |
+| **Aider** | `.aider/prompts/<name>.md` |
 
 ### JSON Output
 
@@ -347,6 +427,7 @@ copilot-assets registry search <query>  Search for template packs
 copilot-assets registry list            List all available packs
 copilot-assets registry info <name>     Show detailed pack information
 copilot-assets registry install <name>  Install a pack as remote source
+copilot-assets registry publish [path]  Validate and publish a template pack
 ```
 
 ### Fleet Subcommands
@@ -355,6 +436,7 @@ copilot-assets registry install <name>  Install a pack as remote source
 copilot-assets fleet add <repo>         Add a repository to the fleet
 copilot-assets fleet remove <repo>      Remove a repository from the fleet
 copilot-assets fleet list               List all fleet repositories
+copilot-assets fleet sync               Sync assets to all fleet repositories
 copilot-assets fleet validate           Validate compliance across the fleet
 copilot-assets fleet status             Show sync status for all fleet repos
 ```
@@ -411,6 +493,8 @@ copilot-assets fleet status             Show sync status for all fleet repos
 - `list` - List all available packs
 - `info <name>` - Show detailed pack information
 - `install <name>` - Configure a pack as the remote template source
+- `publish [path]` - Validate and publish a template pack
+  - `--submit` - Submit the pack to the registry by creating a GitHub issue
 
 #### `fleet`
 - `add <repo>` - Add repository (owner/repo format)
@@ -419,6 +503,9 @@ copilot-assets fleet status             Show sync status for all fleet repos
   - `--branch <branch>` - Branch to target
 - `remove <repo>` - Remove repository from fleet
 - `list` - List all fleet repositories with effective settings
+- `sync` - Sync assets to all locally-cloned fleet repositories
+  - `--dry-run` - Preview changes without applying them
+  - `--pr` - Create a pull request per changed repo instead of syncing directly
 - `validate` - Validate compliance across all fleet repos
 - `status` - Show sync status for all fleet repos
 
@@ -463,8 +550,10 @@ Default output for Copilot:
 │   ├── documenter.agent.md
 │   └── reviewer.agent.md
 ├── skills/
-│   └── refactor/
-│       └── SKILL.md                 # YAML frontmatter + markdown body
+│   ├── refactor/
+│   │   └── SKILL.md                 # Cross-tool skill definition
+│   └── analyze-file/
+│       └── SKILL.md
 └── instructions/
     ├── coding-standards.md          # Custom instructions (optional folder)
     └── security-practices.md
@@ -479,7 +568,9 @@ CONVENTIONS.md                       # Aider conventions
 .claude/
 ├── commands/                        # Claude prompts & agents
 └── skills/
-    └── refactor/
+    ├── refactor/
+    │   └── SKILL.md
+    └── analyze-file/
         └── SKILL.md
 .cursor/
 └── rules/

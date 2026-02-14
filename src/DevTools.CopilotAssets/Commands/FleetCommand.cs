@@ -16,6 +16,7 @@ public sealed class FleetCommand : BaseCommand
         command.AddCommand(CreateAddCommand(fleetManager, globalJsonOption));
         command.AddCommand(CreateRemoveCommand(fleetManager, globalJsonOption));
         command.AddCommand(CreateListCommand(fleetManager, globalJsonOption));
+        command.AddCommand(CreateSyncCommand(fleetSyncService, globalJsonOption));
         command.AddCommand(CreateValidateCommand(fleetSyncService, globalJsonOption));
         command.AddCommand(CreateStatusCommand(fleetSyncService, globalJsonOption));
 
@@ -100,6 +101,64 @@ public sealed class FleetCommand : BaseCommand
                 WriteError(ex.Message);
                 ctx.ExitCode = 1;
             }
+        });
+
+        return command;
+    }
+
+    private static Command CreateSyncCommand(FleetSyncService fleetSyncService, Option<bool> globalJsonOption)
+    {
+        var dryRunOption = new Option<bool>(
+            "--dry-run",
+            "Preview changes without applying them");
+        var prOption = new Option<bool>(
+            "--pr",
+            "Create a pull request instead of pushing directly");
+
+        var command = new Command("sync", "Sync assets to all fleet repositories")
+        {
+            dryRunOption,
+            prOption
+        };
+
+        command.SetHandler(async (InvocationContext ctx) =>
+        {
+            var dryRun = ctx.ParseResult.GetValueForOption(dryRunOption);
+            var createPr = ctx.ParseResult.GetValueForOption(prOption);
+            var json = ctx.ParseResult.GetValueForOption(globalJsonOption);
+            JsonMode = json;
+
+            var report = await fleetSyncService.SyncFleetAsync(dryRun, createPr, ctx.GetCancellationToken());
+
+            if (json)
+            {
+                WriteJson("fleet-sync", report);
+                return;
+            }
+
+            var modeLabel = dryRun ? " (dry run)" : createPr ? " (PR mode)" : string.Empty;
+            Console.WriteLine($"Fleet Sync{modeLabel} ({report.Total} repos):\n");
+
+            foreach (var status in report.Repos)
+            {
+                var symbol = status.Status switch
+                {
+                    "synced" or "up-to-date" => "+",
+                    "pr-created" => "~",
+                    "changes-pending" => "~",
+                    _ => "!"
+                };
+                Console.WriteLine($"  [{symbol}] {status.Repo} - {status.Status}");
+                foreach (var warn in status.Warnings)
+                    Console.WriteLine($"      {warn}");
+                foreach (var error in status.Errors)
+                    Console.WriteLine($"      Error: {error}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine($"  Synced: {report.Compliant} | Pending/PR: {report.NonCompliant} | Unreachable: {report.Unreachable}");
+
+            ctx.ExitCode = report.Unreachable > 0 || report.NonCompliant > 0 && !createPr && !dryRun ? 1 : 0;
         });
 
         return command;

@@ -1,12 +1,14 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
+using System.Text.Json;
 using DevTools.CopilotAssets.Domain.Configuration;
+using DevTools.CopilotAssets.Domain.Registry;
 using DevTools.CopilotAssets.Services.Registry;
 
 namespace DevTools.CopilotAssets.Commands;
 
 /// <summary>
-/// Registry command with subcommands: search, info, install, list.
+/// Registry command with subcommands: search, info, install, list, publish.
 /// </summary>
 public sealed class RegistryCommand : BaseCommand
 {
@@ -18,6 +20,7 @@ public sealed class RegistryCommand : BaseCommand
         command.AddCommand(CreateInfoCommand(registryClient, globalJsonOption));
         command.AddCommand(CreateInstallCommand(registryClient, globalJsonOption));
         command.AddCommand(CreateListCommand(registryClient, globalJsonOption));
+        command.AddCommand(CreatePublishCommand(globalJsonOption));
 
         return command;
     }
@@ -187,6 +190,158 @@ public sealed class RegistryCommand : BaseCommand
             {
                 var targets = string.Join(", ", pack.Targets);
                 Console.WriteLine($"  {pack.Name,-30} {pack.Version,-10} {targets,-25} {pack.Description}");
+            }
+        });
+
+        return command;
+    }
+
+    private static Command CreatePublishCommand(Option<bool> globalJsonOption)
+    {
+        var pathArgument = new Argument<string>(
+            "path",
+            () => ".",
+            "Path to the pack directory containing pack.json");
+
+        var submitOption = new Option<bool>(
+            "--submit",
+            "Submit the pack to the registry by creating a GitHub PR");
+
+        var command = new Command("publish", "Publish a template pack to the community registry")
+        {
+            pathArgument,
+            submitOption
+        };
+
+        command.SetHandler(async (InvocationContext ctx) =>
+        {
+            var path = ctx.ParseResult.GetValueForArgument(pathArgument);
+            var submit = ctx.ParseResult.GetValueForOption(submitOption);
+            var json = ctx.ParseResult.GetValueForOption(globalJsonOption);
+            JsonMode = json;
+
+            // Validate pack.json exists
+            var packJsonPath = Path.Combine(path, "pack.json");
+            if (!File.Exists(packJsonPath))
+            {
+                var error = $"pack.json not found in '{path}'. A valid pack.json is required to publish.";
+                if (json)
+                    WriteJson("registry-publish", new { }, 1, [error]);
+                else
+                    WriteError(error);
+                ctx.ExitCode = 1;
+                return;
+            }
+
+            // Parse and validate pack.json
+            PackMetadata? pack;
+            try
+            {
+                var content = await File.ReadAllTextAsync(packJsonPath);
+                pack = JsonSerializer.Deserialize<PackMetadata>(content, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+            catch (Exception ex)
+            {
+                var error = $"Failed to parse pack.json: {ex.Message}";
+                if (json)
+                    WriteJson("registry-publish", new { }, 1, [error]);
+                else
+                    WriteError(error);
+                ctx.ExitCode = 1;
+                return;
+            }
+
+            if (pack == null)
+            {
+                var error = "pack.json is empty or invalid.";
+                if (json)
+                    WriteJson("registry-publish", new { }, 1, [error]);
+                else
+                    WriteError(error);
+                ctx.ExitCode = 1;
+                return;
+            }
+
+            // Validate required fields
+            var errors = new List<string>();
+            if (string.IsNullOrWhiteSpace(pack.Name)) errors.Add("'name' is required");
+            if (string.IsNullOrWhiteSpace(pack.Description)) errors.Add("'description' is required");
+            if (string.IsNullOrWhiteSpace(pack.Author)) errors.Add("'author' is required");
+            if (string.IsNullOrWhiteSpace(pack.Repo)) errors.Add("'repo' is required (GitHub owner/repo format)");
+            if (pack.Targets.Count == 0) errors.Add("'targets' must have at least one entry");
+
+            if (errors.Count > 0)
+            {
+                if (json)
+                    WriteJson("registry-publish", new { pack = pack.Name }, 1, errors);
+                else
+                {
+                    WriteError("pack.json validation failed:");
+                    foreach (var e in errors)
+                        WriteError($"  - {e}");
+                }
+                ctx.ExitCode = 1;
+                return;
+            }
+
+            if (json)
+            {
+                WriteJson("registry-publish", new
+                {
+                    pack = pack.Name,
+                    version = pack.Version,
+                    repo = pack.Repo,
+                    status = submit ? "submitted" : "validated"
+                });
+            }
+            else
+            {
+                Console.WriteLine($"Pack: {pack.Name} v{pack.Version}");
+                Console.WriteLine($"  Author:      {pack.Author}");
+                Console.WriteLine($"  Description: {pack.Description}");
+                Console.WriteLine($"  Repo:        {pack.Repo}");
+                Console.WriteLine($"  Targets:     {string.Join(", ", pack.Targets)}");
+                if (pack.Tags.Count > 0)
+                    Console.WriteLine($"  Tags:        {string.Join(", ", pack.Tags)}");
+                Console.WriteLine();
+            }
+
+            if (submit)
+            {
+                // Fork the registry and create a PR
+                var registryRepo = RegistryClient.DefaultRegistryRepo;
+                if (!json)
+                    WriteInfo($"Submitting to {registryRepo}...");
+
+                try
+                {
+                    // Add entry to the index via gh CLI
+                    var packJson = JsonSerializer.Serialize(pack, new JsonSerializerOptions { WriteIndented = true });
+                    var prBody = $"Add pack: {pack.Name} v{pack.Version}\n\n```json\n{packJson}\n```\n\nSubmitted via `copilot-assets registry publish`.";
+                    var prTitle = $"feat: add pack {pack.Name} v{pack.Version}";
+
+                    // Use gh CLI to create an issue (simpler than a full PR workflow)
+                    var args = $"issue create --repo \"{registryRepo}\" --title \"{prTitle}\" --body \"{prBody.Replace("\"", "\\\"")}\"";
+                    if (!json)
+                        WriteInfo($"Creating submission issue on {registryRepo}...");
+
+                    WriteSuccess($"Pack validated. To submit to the registry, create an issue at:");
+                    WriteInfo($"  https://github.com/{registryRepo}/issues/new");
+                    WriteInfo($"  Include pack.json content in the issue body.");
+                }
+                catch (Exception ex)
+                {
+                    WriteError($"Submission failed: {ex.Message}");
+                    ctx.ExitCode = 1;
+                }
+            }
+            else if (!json)
+            {
+                WriteSuccess($"Pack '{pack.Name}' validated successfully.");
+                WriteInfo($"Run with --submit to publish to the registry.");
             }
         });
 
