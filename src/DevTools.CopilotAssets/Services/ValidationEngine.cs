@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using DevTools.CopilotAssets.Domain;
+using DevTools.CopilotAssets.Infrastructure.Security;
 using DevTools.CopilotAssets.Services.Skills;
 
 namespace DevTools.CopilotAssets.Services;
@@ -72,7 +73,8 @@ public sealed class ValidationEngine
         // Checksum verification
         foreach (var (assetPath, expectedChecksum) in manifest.Checksums)
         {
-            var fullPath = _fileSystem.CombinePath(gitHubPath, assetPath);
+            var resolvedPath = AssetPathResolver.ResolveToFileSystemPath(assetPath);
+            var fullPath = _fileSystem.CombinePath(targetDirectory, resolvedPath);
             if (_fileSystem.Exists(fullPath))
             {
                 var actualChecksum = _fileSystem.ComputeChecksum(fullPath);
@@ -80,17 +82,17 @@ public sealed class ValidationEngine
                 {
                     if (strictMode)
                     {
-                        result.Errors.Add($"File modified: .github/{assetPath} (checksum mismatch)");
+                        result.Errors.Add($"File modified: {resolvedPath} (checksum mismatch)");
                     }
                     else
                     {
-                        result.Warnings.Add($"File modified locally: .github/{assetPath}");
+                        result.Warnings.Add($"File modified locally: {resolvedPath}");
                     }
                 }
             }
             else
             {
-                result.Errors.Add($"Missing asset: .github/{assetPath}");
+                result.Errors.Add($"Missing asset: {resolvedPath}");
             }
         }
 

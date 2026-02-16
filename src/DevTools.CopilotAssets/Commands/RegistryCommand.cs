@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
+using System.Diagnostics;
 using System.Text.Json;
 using DevTools.CopilotAssets.Domain.Configuration;
 using DevTools.CopilotAssets.Domain.Registry;
@@ -311,26 +312,81 @@ public sealed class RegistryCommand : BaseCommand
 
             if (submit)
             {
-                // Fork the registry and create a PR
                 var registryRepo = RegistryClient.DefaultRegistryRepo;
                 if (!json)
                     WriteInfo($"Submitting to {registryRepo}...");
 
                 try
                 {
-                    // Add entry to the index via gh CLI
                     var packJson = JsonSerializer.Serialize(pack, new JsonSerializerOptions { WriteIndented = true });
                     var prBody = $"Add pack: {pack.Name} v{pack.Version}\n\n```json\n{packJson}\n```\n\nSubmitted via `copilot-assets registry publish`.";
                     var prTitle = $"feat: add pack {pack.Name} v{pack.Version}";
+                    var ghArgs = $"issue create --repo \"{registryRepo}\" --title \"{prTitle}\" --body \"{prBody.Replace("\"", "\\\"")}\"";
 
-                    // Use gh CLI to create an issue (simpler than a full PR workflow)
-                    var args = $"issue create --repo \"{registryRepo}\" --title \"{prTitle}\" --body \"{prBody.Replace("\"", "\\\"")}\"";
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = "gh",
+                        Arguments = ghArgs,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+
+                    using var process = Process.Start(psi);
+                    if (process != null)
+                    {
+                        var output = await process.StandardOutput.ReadToEndAsync();
+                        var stderr = await process.StandardError.ReadToEndAsync();
+                        await process.WaitForExitAsync();
+
+                        if (process.ExitCode == 0)
+                        {
+                            var issueUrl = output.Trim();
+                            if (json)
+                                WriteJson("registry-publish", new { pack = pack.Name, version = pack.Version, status = "submitted", issueUrl });
+                            else
+                            {
+                                WriteSuccess($"Submission issue created: {issueUrl}");
+                            }
+                        }
+                        else
+                        {
+                            // gh failed - fall back to manual instructions
+                            if (!json)
+                            {
+                                WriteError($"gh CLI returned an error: {stderr.Trim()}");
+                                WriteSuccess($"Pack validated. To submit manually, create an issue at:");
+                                WriteInfo($"  https://github.com/{registryRepo}/issues/new");
+                                WriteInfo($"  Include pack.json content in the issue body.");
+                            }
+                            ctx.ExitCode = 1;
+                        }
+                    }
+                    else
+                    {
+                        // gh not found - fall back gracefully
+                        if (!json)
+                        {
+                            WriteError("gh CLI not found. Install GitHub CLI to auto-submit.");
+                            WriteSuccess($"Pack validated. To submit manually, create an issue at:");
+                            WriteInfo($"  https://github.com/{registryRepo}/issues/new");
+                            WriteInfo($"  Include pack.json content in the issue body.");
+                        }
+                        ctx.ExitCode = 1;
+                    }
+                }
+                catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is FileNotFoundException)
+                {
+                    // gh CLI not installed
                     if (!json)
-                        WriteInfo($"Creating submission issue on {registryRepo}...");
-
-                    WriteSuccess($"Pack validated. To submit to the registry, create an issue at:");
-                    WriteInfo($"  https://github.com/{registryRepo}/issues/new");
-                    WriteInfo($"  Include pack.json content in the issue body.");
+                    {
+                        WriteError("gh CLI not found. Install GitHub CLI (https://cli.github.com/) to auto-submit.");
+                        WriteSuccess($"Pack validated. To submit manually, create an issue at:");
+                        WriteInfo($"  https://github.com/{registryRepo}/issues/new");
+                        WriteInfo($"  Include pack.json content in the issue body.");
+                    }
+                    ctx.ExitCode = 1;
                 }
                 catch (Exception ex)
                 {

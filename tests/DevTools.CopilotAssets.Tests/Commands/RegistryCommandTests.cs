@@ -1,8 +1,11 @@
+using System.CommandLine;
+using System.CommandLine.IO;
+using System.CommandLine.Parsing;
+using System.Text;
+using System.Text.Json;
 using DevTools.CopilotAssets.Commands;
 using DevTools.CopilotAssets.Services.Http;
 using DevTools.CopilotAssets.Services.Registry;
-using FluentAssertions;
-using Xunit;
 
 namespace DevTools.CopilotAssets.Tests.Commands;
 
@@ -97,5 +100,137 @@ public class RegistryCommandTests
 
         var optionNames = publishCommand.Options.Select(o => o.Name).ToList();
         optionNames.Should().Contain("submit");
+    }
+
+    [Fact]
+    public async Task PublishCommand_ValidPackJson_ReturnsExitCodeZero()
+    {
+        // Arrange
+        var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var pack = new
+            {
+                name = "my-test-pack",
+                description = "A test pack",
+                author = "test-author",
+                repo = "testorg/test-pack",
+                targets = new[] { "copilot" },
+                version = "1.0.0"
+            };
+            await File.WriteAllTextAsync(
+                Path.Combine(tempDir, "pack.json"),
+                JsonSerializer.Serialize(pack));
+
+            var console = new TestConsole();
+            var command = RegistryCommand.Create(_registryClient, _jsonOption);
+
+            // Act
+            var exitCode = await command.InvokeAsync(["publish", tempDir], console);
+
+            // Assert
+            exitCode.Should().Be(0, "valid pack.json should succeed");
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task PublishCommand_MissingPackJson_ReturnsExitCodeOne()
+    {
+        // Arrange
+        var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var console = new TestConsole();
+            var command = RegistryCommand.Create(_registryClient, _jsonOption);
+
+            // Act - no pack.json in the temp dir
+            var exitCode = await command.InvokeAsync(["publish", tempDir], console);
+
+            // Assert: missing pack.json should return exit code 1
+            // Note: error text goes to Console.Error (not TestConsole), so we only check exit code
+            exitCode.Should().Be(1, "missing pack.json should fail");
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task PublishCommand_MissingRequiredFields_ReturnsExitCodeOne()
+    {
+        // Arrange - pack.json with missing required fields
+        var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            // Missing: description, author, repo, targets
+            var pack = new { name = "incomplete-pack" };
+            await File.WriteAllTextAsync(
+                Path.Combine(tempDir, "pack.json"),
+                JsonSerializer.Serialize(pack));
+
+            var console = new TestConsole();
+            var command = RegistryCommand.Create(_registryClient, _jsonOption);
+
+            // Act
+            var exitCode = await command.InvokeAsync(["publish", tempDir], console);
+
+            // Assert
+            exitCode.Should().Be(1, "pack with missing required fields should fail validation");
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task PublishCommand_JsonOutput_ReturnsExitCodeZero()
+    {
+        // Arrange: --json is a global option on the root command; we simulate that here
+        var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var pack = new
+            {
+                name = "json-test-pack",
+                description = "A test pack for JSON output",
+                author = "test-author",
+                repo = "testorg/json-test-pack",
+                targets = new[] { "copilot" },
+                version = "1.0.0"
+            };
+            await File.WriteAllTextAsync(
+                Path.Combine(tempDir, "pack.json"),
+                JsonSerializer.Serialize(pack));
+
+            var jsonOption = new Option<bool>("--json");
+            var registryCommand = RegistryCommand.Create(_registryClient, jsonOption);
+
+            // Create root command with global --json option (mirrors production Program.cs setup)
+            var rootCommand = new RootCommand();
+            rootCommand.AddGlobalOption(jsonOption);
+            rootCommand.AddCommand(registryCommand);
+
+            var console = new TestConsole();
+
+            // Act: invoke as "registry publish <path> --json" from root
+            var exitCode = await rootCommand.InvokeAsync(["registry", "publish", tempDir, "--json"], console);
+
+            // Assert: valid pack should succeed even with --json flag
+            exitCode.Should().Be(0, "valid pack.json with --json should succeed");
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
     }
 }

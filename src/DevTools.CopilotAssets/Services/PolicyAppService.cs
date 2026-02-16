@@ -1,4 +1,5 @@
 using DevTools.CopilotAssets.Domain;
+using DevTools.CopilotAssets.Infrastructure.Security;
 
 namespace DevTools.CopilotAssets.Services;
 
@@ -258,7 +259,8 @@ public sealed class PolicyAppService : IPolicyAppService
             if (options.Filter != null && !options.Filter.ShouldInclude(category))
                 continue;
 
-            var fullPath = _fileSystem.CombinePath(targetDir, ".github", assetPath);
+            var resolvedPath = AssetPathResolver.ResolveToFileSystemPath(assetPath);
+            var fullPath = _fileSystem.CombinePath(targetDir, resolvedPath);
             var name = Path.GetFileName(assetPath);
             var type = category.ToString().ToLowerInvariant();
 
@@ -324,7 +326,8 @@ public sealed class PolicyAppService : IPolicyAppService
             if (options.Filter != null && !options.Filter.ShouldInclude(category))
                 continue;
 
-            var fullPath = _fileSystem.CombinePath(targetDir, ".github", assetPath);
+            var resolvedPath = AssetPathResolver.ResolveToFileSystemPath(assetPath);
+            var fullPath = _fileSystem.CombinePath(targetDir, resolvedPath);
             var name = Path.GetFileName(assetPath);
             var type = category.ToString().ToLowerInvariant();
             var expectedChecksum = manifest.Checksums.GetValueOrDefault(assetPath);

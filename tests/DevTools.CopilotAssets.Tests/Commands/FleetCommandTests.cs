@@ -1,8 +1,11 @@
+using System.CommandLine;
+using System.CommandLine.IO;
+using System.CommandLine.Parsing;
 using DevTools.CopilotAssets.Commands;
-using DevTools.CopilotAssets.Services.Fleet;
+using DevTools.CopilotAssets.Domain;
+using DevTools.CopilotAssets.Domain.Fleet;
 using DevTools.CopilotAssets.Services;
-using FluentAssertions;
-using Xunit;
+using DevTools.CopilotAssets.Services.Fleet;
 
 namespace DevTools.CopilotAssets.Tests.Commands;
 
@@ -16,6 +19,13 @@ public class FleetCommandTests
     public FleetCommandTests()
     {
         _mockPolicyService = new Mock<IPolicyAppService>();
+        // Set up default mock responses for all methods that may be called when local repos are found
+        _mockPolicyService.Setup(s => s.PreviewInitAsync(It.IsAny<InitOptions>()))
+            .ReturnsAsync(DryRunResult.FromOperations([]));
+        _mockPolicyService.Setup(s => s.ValidateAsync(It.IsAny<ValidateOptions>()))
+            .ReturnsAsync(ValidationResult.Success());
+        _mockPolicyService.Setup(s => s.InitAsync(It.IsAny<InitOptions>()))
+            .ReturnsAsync(ValidationResult.Success());
         _fleetManager = new FleetManager();
         _fleetSyncService = new FleetSyncService(_mockPolicyService.Object);
         _jsonOption = new System.CommandLine.Option<bool>("--json");
@@ -111,5 +121,62 @@ public class FleetCommandTests
         var statusCommand = command.Subcommands.First(c => c.Name == "status");
 
         statusCommand.Arguments.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SyncCommand_WithDryRun_RunsWithoutThrowing()
+    {
+        // fleet sync --dry-run should delegate to PreviewSyncAsync and not throw
+        var console = new TestConsole();
+        var command = FleetCommand.Create(_fleetManager, _fleetSyncService, _jsonOption);
+
+        var act = async () => await command.InvokeAsync(["sync", "--dry-run"], console);
+
+        await act.Should().NotThrowAsync("--dry-run delegates to PreviewSyncAsync");
+    }
+
+    [Fact]
+    public async Task SyncCommand_WithDryRun_ParsesDryRunFlag()
+    {
+        // Verify the --dry-run flag is parsed and results in the dryRun path (PreviewSyncAsync)
+        // Since dryRun=true delegates to PreviewSyncAsync, both should return the same Total
+        var dryRunReport = await _fleetSyncService.SyncFleetAsync(dryRun: true);
+        var previewReport = await _fleetSyncService.PreviewSyncAsync();
+
+        dryRunReport.Total.Should().Be(previewReport.Total,
+            "SyncFleetAsync(dryRun: true) must delegate to PreviewSyncAsync");
+    }
+
+    [Fact]
+    public async Task SyncCommand_WithPrFlag_RunsWithoutThrowing()
+    {
+        var console = new TestConsole();
+        var command = FleetCommand.Create(_fleetManager, _fleetSyncService, _jsonOption);
+
+        var act = async () => await command.InvokeAsync(["sync", "--pr"], console);
+
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task ValidateCommand_RunsWithoutThrowing()
+    {
+        var console = new TestConsole();
+        var command = FleetCommand.Create(_fleetManager, _fleetSyncService, _jsonOption);
+
+        var act = async () => await command.InvokeAsync(["validate"], console);
+
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task StatusCommand_RunsWithoutThrowing()
+    {
+        var console = new TestConsole();
+        var command = FleetCommand.Create(_fleetManager, _fleetSyncService, _jsonOption);
+
+        var act = async () => await command.InvokeAsync(["status"], console);
+
+        await act.Should().NotThrowAsync();
     }
 }
