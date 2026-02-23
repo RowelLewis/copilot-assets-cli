@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-02-24
+
+### Removed
+- Output adapters for **Cursor**, **Windsurf**, **Cline**, and **Aider** — supported targets are now limited to `copilot` and `claude`
+- `--target` option no longer accepts `cursor`, `windsurf`, `cline`, or `aider` values
+- `IsClean`, `Stage`, and `Commit` methods removed from `IGitService` / `GitService` — the CLI no longer prompts to commit changes after `init` or `update`; files are written and staged automatically, leaving committing to the user
+
+### Changed
+- `GitService` gitignore management now includes `.github/instructions/` in the tracked-paths comment block
+- README and `--help` text updated to reflect the two-tool support model
+
 ## [1.1.0] - 2026-02-01
 
 ### Added

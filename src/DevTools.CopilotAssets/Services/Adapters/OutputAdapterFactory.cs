@@ -10,11 +10,7 @@ public sealed class OutputAdapterFactory
     private static readonly Dictionary<TargetTool, Func<IOutputAdapter>> AdapterCreators = new()
     {
         [TargetTool.Copilot] = () => new CopilotOutputAdapter(),
-        [TargetTool.Claude] = () => new ClaudeOutputAdapter(),
-        [TargetTool.Cursor] = () => new CursorOutputAdapter(),
-        [TargetTool.Windsurf] = () => new WindsurfOutputAdapter(),
-        [TargetTool.Cline] = () => new ClineOutputAdapter(),
-        [TargetTool.Aider] = () => new AiderOutputAdapter()
+        [TargetTool.Claude] = () => new ClaudeOutputAdapter()
     };
 
     /// <summary>

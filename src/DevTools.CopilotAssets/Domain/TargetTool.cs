@@ -6,11 +6,7 @@ namespace DevTools.CopilotAssets.Domain;
 public enum TargetTool
 {
     Copilot,
-    Claude,
-    Cursor,
-    Windsurf,
-    Cline,
-    Aider
+    Claude
 }
 
 /// <summary>
@@ -21,11 +17,7 @@ public static class TargetToolExtensions
     private static readonly Dictionary<string, TargetTool> NameMap = new(StringComparer.OrdinalIgnoreCase)
     {
         ["copilot"] = TargetTool.Copilot,
-        ["claude"] = TargetTool.Claude,
-        ["cursor"] = TargetTool.Cursor,
-        ["windsurf"] = TargetTool.Windsurf,
-        ["cline"] = TargetTool.Cline,
-        ["aider"] = TargetTool.Aider
+        ["claude"] = TargetTool.Claude
     };
 
     /// <summary>

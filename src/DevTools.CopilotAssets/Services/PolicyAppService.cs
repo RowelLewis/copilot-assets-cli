@@ -62,33 +62,6 @@ public sealed class PolicyAppService : IPolicyAppService
             _git.EnsureGitignoreIgnoresCopilotAssets(targetDir);
         }
 
-        // Git operations
-        if (!options.NoGit && _git.IsRepository(targetDir))
-        {
-            var filesToStage = syncResult.Synced
-                .Select(s => s.FullPath)
-                .ToList();
-
-            // Also stage .gitignore if it was modified
-            var gitignorePath = _fileSystem.CombinePath(targetDir, ".gitignore");
-            if (_fileSystem.Exists(gitignorePath))
-            {
-                filesToStage.Add(gitignorePath);
-            }
-
-            // Prompt user for confirmation
-            if (PromptUserForCommit(syncResult.Synced.Count))
-            {
-                _git.Stage(targetDir, filesToStage.ToArray());
-                _git.Commit(targetDir, "chore: install copilot assets");
-                result.Info.Add("Changes committed to git");
-            }
-            else
-            {
-                result.Info.Add("Changes not committed. Files are ready to be staged.");
-            }
-        }
-
         result.Info.Add($"✓ Installed {syncResult.Synced.Count} asset(s)");
         result.Warnings.AddRange(syncResult.Warnings);
 
@@ -147,32 +120,6 @@ public sealed class PolicyAppService : IPolicyAppService
         if (!options.NoGit && _git.IsRepository(targetDir))
         {
             _git.EnsureGitignoreIgnoresCopilotAssets(targetDir);
-        }
-
-        // Git operations
-        if (!options.NoGit && _git.IsRepository(targetDir))
-        {
-            var filesToStage = syncResult.Synced
-                .Select(s => s.FullPath)
-                .ToList();
-
-            var gitignorePath = _fileSystem.CombinePath(targetDir, ".gitignore");
-            if (_fileSystem.Exists(gitignorePath))
-            {
-                filesToStage.Add(gitignorePath);
-            }
-
-            // Prompt user for confirmation
-            if (PromptUserForCommit(syncResult.Synced.Count))
-            {
-                _git.Stage(targetDir, filesToStage.ToArray());
-                _git.Commit(targetDir, "chore: update copilot assets");
-                result.Info.Add("Changes committed to git");
-            }
-            else
-            {
-                result.Info.Add("Changes not committed. Files are ready to be staged.");
-            }
         }
 
         var updated = syncResult.Synced.Count(s => s.WasUpdated);
@@ -565,21 +512,6 @@ public sealed class PolicyAppService : IPolicyAppService
         return await PreviewInitAsync(initOptions);
     }
 
-    /// <summary>
-    /// Prompt user for confirmation before committing changes.
-    /// </summary>
-    private bool PromptUserForCommit(int fileCount)
-    {
-        Console.WriteLine();
-        Console.WriteLine($"Ready to commit {fileCount} file(s) to git.");
-        Console.Write("Do you want to commit these changes? [Y/n]: ");
-
-        var response = Console.ReadLine()?.Trim().ToLowerInvariant();
-
-        // Default to Yes if user just presses Enter
-        return string.IsNullOrEmpty(response) || response == "y" || response == "yes";
-    }
-
     /// <inheritdoc />
     public Task<(List<PendingFile> Files, string? Source, string? Error)> GetPendingOperationsAsync(
         string targetDirectory,
@@ -621,33 +553,6 @@ public sealed class PolicyAppService : IPolicyAppService
         if (!noGit && _git.IsRepository(targetDir))
         {
             _git.EnsureGitignoreIgnoresCopilotAssets(targetDir);
-        }
-
-        // Git operations
-        if (!noGit && _git.IsRepository(targetDir))
-        {
-            var filesToStage = syncResult.Synced
-                .Select(s => s.FullPath)
-                .ToList();
-
-            // Also stage .gitignore if it was modified
-            var gitignorePath = _fileSystem.CombinePath(targetDir, ".gitignore");
-            if (_fileSystem.Exists(gitignorePath))
-            {
-                filesToStage.Add(gitignorePath);
-            }
-
-            // Prompt user for confirmation
-            if (PromptUserForCommit(syncResult.Synced.Count))
-            {
-                _git.Stage(targetDir, filesToStage.ToArray());
-                _git.Commit(targetDir, "chore: install copilot assets");
-                result.Info.Add("Changes committed to git");
-            }
-            else
-            {
-                result.Info.Add("Changes not committed. Files are ready to be staged.");
-            }
         }
 
         result.Info.Add($"✓ Installed {syncResult.Synced.Count} asset(s)");

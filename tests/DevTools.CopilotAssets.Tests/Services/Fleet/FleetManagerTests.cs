@@ -35,12 +35,12 @@ public class FleetManagerTests
         var repo = new FleetRepo
         {
             Name = "org/repo",
-            Targets = ["copilot", "claude", "cursor"]
+            Targets = ["copilot", "claude"]
         };
 
         var result = FleetManager.GetEffectiveTargets(repo, config);
 
-        result.Should().HaveCount(3);
+        result.Should().HaveCount(2);
         result.Should().Contain("claude");
     }
 

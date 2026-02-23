@@ -42,7 +42,7 @@ public sealed class InitCommand : BaseCommand
 
         var targetToolOption = new Option<string?>(
             ["-t", "--target"],
-            "Target AI tools (comma-separated: copilot,claude,cursor,windsurf,cline,aider). Default: copilot");
+            "Target AI tools (comma-separated: copilot,claude). Default: copilot");
 
         var pathArgument = new Argument<string>(
             "path",

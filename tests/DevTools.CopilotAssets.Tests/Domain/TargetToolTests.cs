@@ -8,10 +8,6 @@ public class TargetToolTests
     [Theory]
     [InlineData("copilot", TargetTool.Copilot)]
     [InlineData("claude", TargetTool.Claude)]
-    [InlineData("cursor", TargetTool.Cursor)]
-    [InlineData("windsurf", TargetTool.Windsurf)]
-    [InlineData("cline", TargetTool.Cline)]
-    [InlineData("aider", TargetTool.Aider)]
     public void ParseTargets_WithSingleValidTarget_ShouldSucceed(string input, TargetTool expected)
     {
         var (success, tools, error) = TargetToolExtensions.ParseTargets(input);
@@ -24,23 +20,22 @@ public class TargetToolTests
     [Fact]
     public void ParseTargets_WithMultipleTargets_ShouldReturnAll()
     {
-        var (success, tools, error) = TargetToolExtensions.ParseTargets("copilot,claude,cursor");
+        var (success, tools, error) = TargetToolExtensions.ParseTargets("copilot,claude");
 
         success.Should().BeTrue();
-        tools.Should().HaveCount(3);
+        tools.Should().HaveCount(2);
         tools.Should().Contain(TargetTool.Copilot);
         tools.Should().Contain(TargetTool.Claude);
-        tools.Should().Contain(TargetTool.Cursor);
         error.Should().BeNull();
     }
 
     [Fact]
     public void ParseTargets_CaseInsensitive_ShouldSucceed()
     {
-        var (success, tools, _) = TargetToolExtensions.ParseTargets("COPILOT,Claude,CuRsOr");
+        var (success, tools, _) = TargetToolExtensions.ParseTargets("COPILOT,Claude");
 
         success.Should().BeTrue();
-        tools.Should().HaveCount(3);
+        tools.Should().HaveCount(2);
     }
 
     [Fact]
@@ -75,19 +70,15 @@ public class TargetToolTests
     [Fact]
     public void ParseTargets_WithSpacesInInput_ShouldTrim()
     {
-        var (success, tools, _) = TargetToolExtensions.ParseTargets("copilot , claude , cursor");
+        var (success, tools, _) = TargetToolExtensions.ParseTargets("copilot , claude");
 
         success.Should().BeTrue();
-        tools.Should().HaveCount(3);
+        tools.Should().HaveCount(2);
     }
 
     [Theory]
     [InlineData(TargetTool.Copilot, "copilot")]
     [InlineData(TargetTool.Claude, "claude")]
-    [InlineData(TargetTool.Cursor, "cursor")]
-    [InlineData(TargetTool.Windsurf, "windsurf")]
-    [InlineData(TargetTool.Cline, "cline")]
-    [InlineData(TargetTool.Aider, "aider")]
     public void ToConfigName_ShouldReturnLowercaseName(TargetTool tool, string expected)
     {
         tool.ToConfigName().Should().Be(expected);

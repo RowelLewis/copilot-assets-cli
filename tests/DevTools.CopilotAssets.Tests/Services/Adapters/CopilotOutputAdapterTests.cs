@@ -108,13 +108,9 @@ public class CopilotOutputAdapterTests
         var content = """
             # Base
 
-            <!-- cursor-only -->
-            Cursor stuff.
-            <!-- /cursor-only -->
-
-            <!-- windsurf-only -->
-            Windsurf stuff.
-            <!-- /windsurf-only -->
+            <!-- claude-only -->
+            Claude stuff.
+            <!-- /claude-only -->
 
             <!-- copilot-only -->
             Copilot stuff.
@@ -135,8 +131,7 @@ public class CopilotOutputAdapterTests
         result.Should().Contain("# Base");
         result.Should().Contain("Copilot stuff.");
         result.Should().Contain("End.");
-        result.Should().NotContain("Cursor stuff.");
-        result.Should().NotContain("Windsurf stuff.");
+        result.Should().NotContain("Claude stuff.");
     }
 
     [Fact]

@@ -1,6 +1,6 @@
 # copilot-assets
 
-A .NET global tool for installing and managing AI coding assistant assets (prompts, agents, instructions, skills) across multiple tools and repositories. Supports **GitHub Copilot**, **Claude Code**, **Cursor**, **Windsurf**, **Cline**, and **Aider**.
+A .NET global tool for installing and managing AI coding assistant assets (prompts, agents, instructions, skills) across multiple tools and repositories. Supports **GitHub Copilot** and **Claude Code**.
 
 ## Installation
 
@@ -30,17 +30,14 @@ This creates assets for your target AI tool(s). By default, assets are generated
 Generate assets for multiple AI coding tools from a single set of templates:
 
 ```bash
-# Generate for Copilot and Claude
+# Generate for both Copilot and Claude
 copilot-assets init --target copilot,claude
 
-# Generate for all supported tools
-copilot-assets init --target copilot,claude,cursor,windsurf,cline,aider
-
-# Update with specific targets
-copilot-assets update --target copilot,cursor
+# Update with a specific target
+copilot-assets update --target claude
 ```
 
-**Supported targets:** `copilot`, `claude`, `cursor`, `windsurf`, `cline`, `aider`
+**Supported targets:** `copilot`, `claude`
 
 Each tool gets assets in its native format and directory structure:
 
@@ -48,10 +45,6 @@ Each tool gets assets in its native format and directory structure:
 |------|-------------|---------|--------------|
 | **Copilot** | `.github/copilot-instructions.md`<br/>`.github/instructions/` | `.github/prompts/` | `.github/agents/`, `.github/skills/` |
 | **Claude** | `CLAUDE.md`<br/>`.claude/instructions/` | `.claude/commands/` | `.claude/skills/` |
-| **Cursor** | `.cursor/rules/instructions.mdc`<br/>`.cursor/rules/` | `.cursor/rules/*.mdc` | YAML frontmatter |
-| **Windsurf** | `.windsurfrules`<br/>`.windsurf/rules/` | `.windsurf/rules/` | — |
-| **Cline** | `.clinerules/instructions.md`<br/>`.clinerules/` | `.clinerules/` | — |
-| **Aider** | `CONVENTIONS.md`<br/>(instructions/ → root) | `.aider/prompts/` | — |
 
 **Tool-specific content sections:** Templates can include sections for specific tools using HTML comment markers:
 
@@ -145,7 +138,7 @@ A valid `pack.json` is required with these fields:
   "author": "My Org",
   "repo": "my-org/copilot-assets-pack",
   "tags": ["enterprise", "dotnet"],
-  "targets": ["copilot", "claude", "cursor"],
+  "targets": ["copilot", "claude"],
   "version": "1.0.0"
 }
 ```
@@ -232,9 +225,8 @@ Follow these coding standards when working on this project:
 **Supported by:**
 - GitHub Copilot (`.github/instructions/`)
 - Claude Code (`.claude/instructions/`)
-- Cursor (`.cursor/rules/*.mdc`)
 
-When using `--target` with multiple tools, instruction files are adapted to each tool's native format while preserving the frontmatter and content.
+When using `--target copilot,claude`, instruction files are adapted to each tool's native format while preserving the frontmatter and content.
 
 ### Update to Latest Version
 
@@ -371,10 +363,6 @@ When targeting multiple tools, skills are placed in each tool's native location:
 |------|-----------|
 | **Copilot** | `.github/skills/<name>/SKILL.md` |
 | **Claude** | `.claude/skills/<name>/SKILL.md` |
-| **Cursor** | `.cursor/rules/<name>.mdc` |
-| **Windsurf** | `.windsurf/rules/<name>.md` |
-| **Cline** | `.clinerules/<name>.md` |
-| **Aider** | `.aider/prompts/<name>.md` |
 
 ### JSON Output
 
@@ -452,7 +440,7 @@ copilot-assets fleet status             Show sync status for all fleet repos
 - `-i, --interactive` - Review and select files individually or by folder
 - `-f, --force` - Overwrite existing files
 - `-s, --source <source>` - Template source: 'default' or 'owner/repo[@branch]'
-- `-t, --target <targets>` - Target AI tools (comma-separated): copilot, claude, cursor, windsurf, cline, aider
+- `-t, --target <targets>` - Target AI tools (comma-separated): copilot, claude
 - `--no-git` - Skip Git operations (staging/commits)
 - `--only <types>` - Install only specified types (instruction, prompts, agents, skills)
 - `--exclude <types>` - Exclude specified types
@@ -559,12 +547,10 @@ Default output for Copilot:
     └── security-practices.md
 ```
 
-When targeting multiple tools (e.g., `--target copilot,claude,cursor`), additional output is generated:
+When targeting both tools (`--target copilot,claude`), additional Claude output is generated:
 
 ```
 CLAUDE.md                            # Claude Code instructions
-CONVENTIONS.md                       # Aider conventions
-.windsurfrules                       # Windsurf instructions
 .claude/
 ├── commands/                        # Claude prompts & agents
 └── skills/
@@ -572,19 +558,6 @@ CONVENTIONS.md                       # Aider conventions
     │   └── SKILL.md
     └── analyze-file/
         └── SKILL.md
-.cursor/
-└── rules/
-    ├── instructions.mdc             # Cursor rules with YAML frontmatter
-    └── code-review.mdc
-.clinerules/
-├── instructions.md
-└── code-review.prompt.md
-.aider/
-└── prompts/
-    └── code-review.prompt.md
-.windsurf/
-└── rules/
-    └── code-review.prompt.md
 ```
 
 ## Security

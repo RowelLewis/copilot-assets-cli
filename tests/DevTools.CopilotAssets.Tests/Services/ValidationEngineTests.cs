@@ -124,17 +124,16 @@ public class ValidationEngineTests
     [Fact]
     public void Validate_MultiTargetManifest_ResolvesPathsCorrectly()
     {
-        // Arrange - simulate a multi-target manifest with claude: and cursor: tracking paths
+        // Arrange - simulate a multi-target manifest with claude: tracking path
         var manifest = new Manifest
         {
             InstalledAt = DateTime.UtcNow,
             ToolVersion = "1.0.0",
-            Assets = ["copilot-instructions.md", "claude:CLAUDE.md", "cursor:.cursor/rules/instructions.mdc"],
+            Assets = ["copilot-instructions.md", "claude:CLAUDE.md"],
             Checksums = new Dictionary<string, string>
             {
                 ["copilot-instructions.md"] = "a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd",
-                ["claude:CLAUDE.md"] = "b2c3d4e5f6789012345678901234567890123456789012345678901234abcde1",
-                ["cursor:.cursor/rules/instructions.mdc"] = "c3d4e5f6789012345678901234567890123456789012345678901234abcde12a"
+                ["claude:CLAUDE.md"] = "b2c3d4e5f6789012345678901234567890123456789012345678901234abcde1"
             }
         };
 
@@ -156,8 +155,6 @@ public class ValidationEngineTests
             .Returns(true);
         _mockFileSystem.Setup(f => f.Exists(It.Is<string>(s => s.EndsWith("CLAUDE.md") && !s.Contains(".github"))))
             .Returns(true);
-        _mockFileSystem.Setup(f => f.Exists(It.Is<string>(s => s.Contains(".cursor/rules/instructions.mdc"))))
-            .Returns(true);
         _mockFileSystem.Setup(f => f.GetFiles(It.IsAny<string>(), "SKILL.md", true))
             .Returns([]);
         _mockFileSystem.Setup(f => f.GetFiles(It.IsAny<string>(), "*", true))
@@ -168,16 +165,14 @@ public class ValidationEngineTests
             .Returns("a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd");
         _mockFileSystem.Setup(f => f.ComputeChecksum(It.Is<string>(s => s.EndsWith("CLAUDE.md"))))
             .Returns("b2c3d4e5f6789012345678901234567890123456789012345678901234abcde1");
-        _mockFileSystem.Setup(f => f.ComputeChecksum(It.Is<string>(s => s.Contains(".cursor/rules/instructions.mdc"))))
-            .Returns("c3d4e5f6789012345678901234567890123456789012345678901234abcde12a");
 
         // Act
         var result = _sut.Validate("/target");
 
         // Assert - should be compliant with no errors about multi-target paths
-        result.Errors.Should().NotContain(e => e.Contains("claude:") || e.Contains("cursor:"),
+        result.Errors.Should().NotContain(e => e.Contains("claude:"),
             "multi-target tracking paths should not appear as-is in error messages");
-        result.Errors.Should().NotContain(e => e.Contains(".github/claude:") || e.Contains(".github/cursor:"),
+        result.Errors.Should().NotContain(e => e.Contains(".github/claude:"),
             "multi-target paths should never be prefixed with .github/");
     }
 

@@ -16,10 +16,6 @@ public class AssetPathResolverTests
 
     [Theory]
     [InlineData("claude:CLAUDE.md", "CLAUDE.md")]
-    [InlineData("cursor:.cursor/rules/instructions.mdc", ".cursor/rules/instructions.mdc")]
-    [InlineData("windsurf:.windsurfrules", ".windsurfrules")]
-    [InlineData("cline:.clinerules/instructions.md", ".clinerules/instructions.md")]
-    [InlineData("aider:.aider.instructions.md", ".aider.instructions.md")]
     public void ResolveToFileSystemPath_MultiTargetPath_ReturnsPathAfterColon(string trackingPath, string expected)
     {
         var result = AssetPathResolver.ResolveToFileSystemPath(trackingPath);
@@ -28,13 +24,13 @@ public class AssetPathResolverTests
 
     [Theory]
     [InlineData("claude:CLAUDE.md", true)]
-    [InlineData("cursor:.cursor/rules/instructions.mdc", true)]
-    [InlineData("windsurf:.windsurfrules", true)]
     [InlineData("CLAUDE:CLAUDE.md", true)] // case-insensitive
     [InlineData("copilot-instructions.md", false)]
     [InlineData("prompts/test.md", false)]
     [InlineData(":no-prefix.md", false)] // colon at position 0
     [InlineData("unknown:file.md", false)] // unknown prefix
+    [InlineData("cursor:.cursor/rules/instructions.mdc", false)] // no longer a known target
+    [InlineData("windsurf:.windsurfrules", false)] // no longer a known target
     public void IsMultiTargetPath_VariousPaths_ReturnsExpected(string path, bool expected)
     {
         var result = AssetPathResolver.IsMultiTargetPath(path);

@@ -57,7 +57,7 @@ public sealed class CopilotOutputAdapter : IOutputAdapter
     internal static string StripToolSpecificSections(string content, string keepTool)
     {
         var result = content;
-        var tools = new[] { "copilot", "claude", "cursor", "windsurf", "cline", "aider" };
+        var tools = new[] { "copilot", "claude" };
 
         foreach (var tool in tools)
         {

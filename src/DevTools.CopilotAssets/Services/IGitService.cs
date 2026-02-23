@@ -16,21 +16,6 @@ public interface IGitService
     bool IsRepository(string path);
 
     /// <summary>
-    /// Check if the working directory is clean (no uncommitted changes).
-    /// </summary>
-    bool IsClean(string path);
-
-    /// <summary>
-    /// Stage files for commit.
-    /// </summary>
-    void Stage(string repoPath, params string[] filePaths);
-
-    /// <summary>
-    /// Commit staged changes.
-    /// </summary>
-    void Commit(string repoPath, string message);
-
-    /// <summary>
     /// Ensure .gitignore ignores Copilot assets.
     /// </summary>
     void EnsureGitignoreIgnoresCopilotAssets(string repoPath);

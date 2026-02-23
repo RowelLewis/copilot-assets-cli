@@ -5,7 +5,7 @@ namespace DevTools.CopilotAssets.Infrastructure.Security;
 /// </summary>
 public static class AssetPathResolver
 {
-    private static readonly string[] KnownTargets = ["copilot", "claude", "cursor", "windsurf", "cline", "aider"];
+    private static readonly string[] KnownTargets = ["copilot", "claude"];
 
     /// <summary>
     /// Resolve a manifest tracking path to a file system path relative to the project root.

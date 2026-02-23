@@ -79,27 +79,6 @@ public class GitServiceTests
     }
 
     [Fact]
-    public void IsClean_WhenNotARepo_ShouldReturnTrue()
-    {
-        // For non-repos, we consider them "clean" (no uncommitted changes)
-        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(tempDir);
-
-        try
-        {
-            // Act
-            var result = _sut.IsClean(tempDir);
-
-            // Assert
-            result.Should().BeTrue();
-        }
-        finally
-        {
-            Directory.Delete(tempDir);
-        }
-    }
-
-    [Fact]
     public void EnsureGitignoreIgnoresCopilotAssets_WhenNotARepo_ShouldNotThrow()
     {
         // Arrange

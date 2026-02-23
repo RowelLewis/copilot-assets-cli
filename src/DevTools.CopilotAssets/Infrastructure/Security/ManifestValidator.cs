@@ -71,7 +71,7 @@ public static class ManifestValidator
         if (colonIdx <= 0) return false;
 
         var prefix = path[..colonIdx];
-        var knownTargets = new[] { "copilot", "claude", "cursor", "windsurf", "cline", "aider" };
+        var knownTargets = new[] { "copilot", "claude" };
         return knownTargets.Contains(prefix, StringComparer.OrdinalIgnoreCase);
     }
 
