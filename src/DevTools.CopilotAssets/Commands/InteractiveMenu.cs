@@ -399,19 +399,39 @@ public static class InteractiveMenu
                 if (modCount > 0) statusParts.Add($"{modCount} modified");
                 var statusSummary = string.Join(", ", statusParts);
 
-                var action = PromptFolder(folder, folderFiles.Count, statusSummary);
+                // Get display name (shows "refactor skill" for skills/refactor)
+                var displayName = PendingFile.GetFolderDisplayName(folder);
+                var action = PromptFolder(displayName, folderFiles.Count, statusSummary);
 
                 switch (action)
                 {
                     case FolderAction.All:
                         selectedFiles.AddRange(folderFiles);
                         var actionWord = isUpdate ? "Updated" : "Added";
-                        PrintFileSuccess($"{actionWord} {folderFiles.Count} files");
+                        // For skills, show "Added refactor skill" instead of "Added 1 files"
+                        if (folder.StartsWith("skills/"))
+                        {
+                            var skillName = folder.Substring("skills/".Length);
+                            PrintFileSuccess($"{actionWord} {skillName} skill");
+                        }
+                        else
+                        {
+                            PrintFileSuccess($"{actionWord} {folderFiles.Count} files");
+                        }
                         totalSelected += folderFiles.Count;
                         break;
 
                     case FolderAction.Skip:
-                        PrintFileSkipped($"Skipped {folderFiles.Count} files");
+                        // For skills, show "Skipped refactor skill" instead of "Skipped 1 files"
+                        if (folder.StartsWith("skills/"))
+                        {
+                            var skillName = folder.Substring("skills/".Length);
+                            PrintFileSkipped($"Skipped {skillName} skill");
+                        }
+                        else
+                        {
+                            PrintFileSkipped($"Skipped {folderFiles.Count} files");
+                        }
                         totalSkipped += folderFiles.Count;
                         break;
 

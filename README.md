@@ -1,6 +1,6 @@
 # copilot-assets
 
-A .NET global tool for installing and managing GitHub Copilot assets (prompts, agents, instructions, skills) in your projects.
+A .NET global tool for installing and managing AI coding assistant assets (prompts, agents, instructions, skills) across multiple tools and repositories. Supports **GitHub Copilot** and **Claude Code**.
 
 ## Installation
 
@@ -17,12 +17,52 @@ cd your-project
 copilot-assets init
 ```
 
-This creates:
+This creates assets for your target AI tool(s). By default, assets are generated for GitHub Copilot:
 - `.github/copilot-instructions.md` - Repository context and instructions
 - `.github/prompts/` - Reusable prompt templates
 - `.github/agents/` - AI agent definitions
-- `.github/skills/` - Custom Copilot skills
-- `.github/.copilot-assets.json` - Manifest file tracking installed version
+- `.github/skills/` - Custom skills (cross-tool SKILL.md standard)
+- `.github/instructions/` - Additional custom instructions (optional folder for organizing multiple instruction files)
+- `.github/.copilot-assets.json` - Manifest file tracking installed assets
+
+### Multi-Tool Target Support
+
+Generate assets for multiple AI coding tools from a single set of templates:
+
+```bash
+# Generate for both Copilot and Claude
+copilot-assets init --target copilot,claude
+
+# Update with a specific target
+copilot-assets update --target claude
+```
+
+**Supported targets:** `copilot`, `claude`
+
+Each tool gets assets in its native format and directory structure:
+
+| Tool | Instructions | Prompts | Rules/Config |
+|------|-------------|---------|--------------|
+| **Copilot** | `.github/copilot-instructions.md`<br/>`.github/instructions/` | `.github/prompts/` | `.github/agents/`, `.github/skills/` |
+| **Claude** | `CLAUDE.md`<br/>`.claude/instructions/` | `.claude/commands/` | `.claude/skills/` |
+
+**Tool-specific content sections:** Templates can include sections for specific tools using HTML comment markers:
+
+```markdown
+# Instructions
+
+General instructions for all tools.
+
+<!-- copilot-only -->
+Copilot-specific guidance here.
+<!-- /copilot-only -->
+
+<!-- claude-only -->
+Claude-specific guidance here.
+<!-- /claude-only -->
+```
+
+When generating output for a target tool, sections for other tools are automatically stripped, and the target tool's markers are removed while preserving the content.
 
 ### Remote Template Configuration
 
@@ -53,6 +93,55 @@ When configured, `init` and `update` commands will:
 **Authentication:** Supports private repositories via:
 - `gh` CLI (recommended): `gh auth login`
 - Environment variables: `GITHUB_TOKEN` or `GH_TOKEN`
+
+### Template Pack Registry
+
+Discover and install community template packs:
+
+```bash
+# Search for template packs
+copilot-assets registry search dotnet
+
+# List all available packs
+copilot-assets registry list
+
+# Get detailed info about a pack
+copilot-assets registry info dotnet-enterprise
+
+# Install a pack (configures it as your remote source)
+copilot-assets registry install dotnet-enterprise
+```
+
+After installing a registry pack, run `copilot-assets init` or `copilot-assets update` to fetch and apply the templates.
+
+### Publishing a Template Pack
+
+Validate and publish your own template pack to the community registry:
+
+```bash
+# Validate pack.json in the current directory
+copilot-assets registry publish
+
+# Validate and submit to the registry
+copilot-assets registry publish --submit
+
+# Validate a pack in a specific directory
+copilot-assets registry publish ./my-pack
+```
+
+A valid `pack.json` is required with these fields:
+
+```json
+{
+  "name": "my-org-standards",
+  "description": "My organization's AI coding standards",
+  "author": "My Org",
+  "repo": "my-org/copilot-assets-pack",
+  "tags": ["enterprise", "dotnet"],
+  "targets": ["copilot", "claude"],
+  "version": "1.0.0"
+}
+```
 
 ### Selective Installation
 
@@ -110,6 +199,35 @@ Summary: 4 to install, 0 skipped
 copilot-assets init --dry-run
 ```
 
+### Path-Specific Custom Instructions
+
+The `.github/instructions/` folder supports organizing multiple instruction files for different parts of your codebase. Each instruction file can include YAML frontmatter with glob patterns to specify which files they apply to.
+
+**Example:** `coding-standards.md`
+```yaml
+---
+applyTo: "**/*.cs,**/*.ts,**/*.js,**/*.py"
+---
+
+# Coding Standards
+
+Follow these coding standards when working on this project:
+- Use clear, descriptive variable and function names
+- Keep functions small and focused
+- Add comments for complex logic
+```
+
+**Interactive Mode Display:**
+- Instructions are grouped by file (e.g., "Coding Standards Instructions", "Security Practices Instructions")
+- Each instruction file can be selected individually
+- Displayed with friendly title-cased names derived from filenames
+
+**Supported by:**
+- GitHub Copilot (`.github/instructions/`)
+- Claude Code (`.claude/instructions/`)
+
+When using `--target copilot,claude`, instruction files are adapted to each tool's native format while preserving the frontmatter and content.
+
 ### Update to Latest Version
 
 ```bash
@@ -120,6 +238,56 @@ dotnet tool update -g copilot-assets
 cd your-project
 copilot-assets update
 ```
+
+### Fleet Management
+
+Manage assets across multiple repositories from a single configuration:
+
+```bash
+# Add repositories to your fleet
+copilot-assets fleet add org/repo-1
+copilot-assets fleet add org/repo-2 --source my-templates --target copilot,claude
+
+# List all fleet repositories
+copilot-assets fleet list
+
+# Check sync status across all repos
+copilot-assets fleet status
+
+# Preview what sync would do (dry run)
+copilot-assets fleet sync --dry-run
+
+# Sync assets to all locally-cloned fleet repos
+copilot-assets fleet sync
+
+# Sync via pull requests (creates a branch + PR per changed repo)
+copilot-assets fleet sync --pr
+
+# Validate compliance across the fleet
+copilot-assets fleet validate
+
+# Remove a repository from the fleet
+copilot-assets fleet remove org/repo-1
+```
+
+Fleet configuration supports per-repo overrides for source, targets, and branch, with fleet-wide defaults:
+
+```json
+{
+  "version": 1,
+  "repos": [
+    { "name": "org/repo-1", "source": "my-templates", "targets": ["copilot", "claude"] },
+    { "name": "org/repo-2", "branch": "develop" }
+  ],
+  "defaults": {
+    "source": "default",
+    "targets": ["copilot"],
+    "branch": "main"
+  }
+}
+```
+
+Fleet config is stored at `~/.config/copilot-assets/fleet.json`.
 
 ### List Installed Assets
 
@@ -153,6 +321,49 @@ copilot-assets validate
 copilot-assets validate --ci
 ```
 
+Validation includes:
+- Required file checks
+- SKILL.md validation (name and non-empty body)
+- Checksum integrity verification (strict mode treats modifications as errors)
+- Secret pattern detection (API keys, tokens, private keys)
+
+### SKILL.md Format
+
+Skills use a cross-tool standard format. Each skill lives in its own directory with a `SKILL.md` file:
+
+```
+skills/
+└── refactor/
+    └── SKILL.md
+```
+
+SKILL.md files support optional YAML frontmatter:
+
+```markdown
+---
+name: refactor
+description: Refactor code to improve quality
+version: 1.0
+---
+# Refactor Code Skill
+
+Refactor code to improve quality while preserving behavior.
+
+## Refactoring Techniques
+- Extract Method
+- Rename for clarity
+- Remove duplication
+```
+
+If no frontmatter is present, the skill name is extracted from the first markdown heading and the description from the first paragraph. The `name` field (or heading) is required; the body must not be empty.
+
+When targeting multiple tools, skills are placed in each tool's native location:
+
+| Tool | Skill Path |
+|------|-----------|
+| **Copilot** | `.github/skills/<name>/SKILL.md` |
+| **Claude** | `.claude/skills/<name>/SKILL.md` |
+
 ### JSON Output
 
 All commands support `--json` for machine-readable output:
@@ -163,6 +374,8 @@ copilot-assets update --json
 copilot-assets list --json
 copilot-assets verify --json
 copilot-assets validate --json
+copilot-assets fleet list --json
+copilot-assets registry search dotnet --json
 ```
 
 ### Diagnose Environment
@@ -174,9 +387,11 @@ copilot-assets doctor
 ## Commands
 
 ```
-copilot-assets init [options]       Initialize Copilot assets
+copilot-assets init [options]       Initialize assets for target AI tools
 copilot-assets update [options]     Update assets to latest version
 copilot-assets config <command>     Manage remote template configuration
+copilot-assets registry <command>   Discover and install community template packs
+copilot-assets fleet <command>      Manage assets across multiple repositories
 copilot-assets list [options]       List installed assets
 copilot-assets verify [options]     Verify file integrity
 copilot-assets validate [options]   Validate asset compliance
@@ -193,6 +408,27 @@ copilot-assets config list              List all configuration
 copilot-assets config reset             Reset to bundled templates
 ```
 
+### Registry Subcommands
+
+```
+copilot-assets registry search <query>  Search for template packs
+copilot-assets registry list            List all available packs
+copilot-assets registry info <name>     Show detailed pack information
+copilot-assets registry install <name>  Install a pack as remote source
+copilot-assets registry publish [path]  Validate and publish a template pack
+```
+
+### Fleet Subcommands
+
+```
+copilot-assets fleet add <repo>         Add a repository to the fleet
+copilot-assets fleet remove <repo>      Remove a repository from the fleet
+copilot-assets fleet list               List all fleet repositories
+copilot-assets fleet sync               Sync assets to all fleet repositories
+copilot-assets fleet validate           Validate compliance across the fleet
+copilot-assets fleet status             Show sync status for all fleet repos
+```
+
 ### Global Options
 
 - `--json` - Output results as JSON (all commands)
@@ -204,6 +440,7 @@ copilot-assets config reset             Reset to bundled templates
 - `-i, --interactive` - Review and select files individually or by folder
 - `-f, --force` - Overwrite existing files
 - `-s, --source <source>` - Template source: 'default' or 'owner/repo[@branch]'
+- `-t, --target <targets>` - Target AI tools (comma-separated): copilot, claude
 - `--no-git` - Skip Git operations (staging/commits)
 - `--only <types>` - Install only specified types (instruction, prompts, agents, skills)
 - `--exclude <types>` - Exclude specified types
@@ -214,6 +451,7 @@ copilot-assets config reset             Reset to bundled templates
 - `-i, --interactive` - Review and select files individually or by folder
 - `-f, --force` - Force update even if already at latest version
 - `-s, --source <source>` - Template source: 'default' or 'owner/repo[@branch]'
+- `-t, --target <targets>` - Target AI tools (comma-separated)
 - `--no-git` - Skip Git operations
 - `--only <types>` - Update only specified types
 - `--exclude <types>` - Exclude specified types
@@ -238,6 +476,27 @@ copilot-assets config reset             Reset to bundled templates
 - `list` - Show all configuration settings
 - `reset` - Reset to default bundled templates
 
+#### `registry`
+- `search <query>` - Search packs by name, description, or tags
+- `list` - List all available packs
+- `info <name>` - Show detailed pack information
+- `install <name>` - Configure a pack as the remote template source
+- `publish [path]` - Validate and publish a template pack
+  - `--submit` - Submit the pack to the registry by creating a GitHub issue
+
+#### `fleet`
+- `add <repo>` - Add repository (owner/repo format)
+  - `--source <source>` - Template source for this repo
+  - `--target <targets>` - Target tools (comma-separated)
+  - `--branch <branch>` - Branch to target
+- `remove <repo>` - Remove repository from fleet
+- `list` - List all fleet repositories with effective settings
+- `sync` - Sync assets to all locally-cloned fleet repositories
+  - `--dry-run` - Preview changes without applying them
+  - `--pr` - Create a pull request per changed repo instead of syncing directly
+- `validate` - Validate compliance across all fleet repos
+- `status` - Show sync status for all fleet repos
+
 ## Template Sources
 
 **Default Templates** (bundled)
@@ -252,6 +511,11 @@ copilot-assets config reset             Reset to bundled templates
 - Supports private repositories with authentication
 - Can override per-command with `--source` flag
 
+**Registry Packs** (community)
+- Discoverable via `copilot-assets registry search`
+- Install with a single command
+- Curated template collections with multi-tool support
+
 **Template Resolution:**
 - Interactive mode (`-i`): Prompts for source selection
 - Command-line (`--source`): Uses specified source
@@ -260,10 +524,12 @@ copilot-assets config reset             Reset to bundled templates
 
 ## Installed Asset Structure
 
+Default output for Copilot:
+
 ```
 .github/
 ├── copilot-instructions.md          # Main instructions file
-├── .copilot-assets.json             # Version manifest (auto-generated)
+├── .copilot-assets.json             # Manifest (auto-generated)
 ├── prompts/
 │   ├── code-review.prompt.md
 │   ├── generate-docs.prompt.md
@@ -271,10 +537,37 @@ copilot-assets config reset             Reset to bundled templates
 ├── agents/
 │   ├── documenter.agent.md
 │   └── reviewer.agent.md
-└── skills/
-    ├── analyze-file.skill.md
-    └── refactor.skill.md
+├── skills/
+│   ├── refactor/
+│   │   └── SKILL.md                 # Cross-tool skill definition
+│   └── analyze-file/
+│       └── SKILL.md
+└── instructions/
+    ├── coding-standards.md          # Custom instructions (optional folder)
+    └── security-practices.md
 ```
+
+When targeting both tools (`--target copilot,claude`), additional Claude output is generated:
+
+```
+CLAUDE.md                            # Claude Code instructions
+.claude/
+├── commands/                        # Claude prompts & agents
+└── skills/
+    ├── refactor/
+    │   └── SKILL.md
+    └── analyze-file/
+        └── SKILL.md
+```
+
+## Security
+
+- **Input validation** - Repository names, branch names, and file paths are validated to prevent injection and path traversal attacks
+- **Token redaction** - Sensitive tokens (GitHub PATs, Bearer tokens, API keys) are redacted from error messages and logs
+- **Manifest validation** - Manifests are checked for excessive asset counts, path traversal, and valid checksums
+- **Content limits** - Files are limited to 1 MB and manifests to 100 assets to prevent DoS
+
+See [SECURITY.md](SECURITY.md) for the full security policy.
 
 ## Uninstall
 

@@ -117,6 +117,15 @@ public sealed class ConfigCommand : BaseCommand
                         Environment.ExitCode = 1;
                         return;
                     }
+                    if (!RemoteConfig.IsValidBranch(value))
+                    {
+                        if (json)
+                            WriteJson("config set", new { key, value }, 1, ["Invalid branch name. Branch names cannot contain path separators or special characters"]);
+                        else
+                            WriteError("Invalid branch name. Branch names cannot contain path separators or special characters");
+                        Environment.ExitCode = 1;
+                        return;
+                    }
                     newConfig = config with { Branch = value };
                     break;
 

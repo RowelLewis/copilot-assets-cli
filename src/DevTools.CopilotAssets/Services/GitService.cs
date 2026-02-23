@@ -14,6 +14,7 @@ public sealed class GitService : IGitService
     [
         "# GitHub Copilot Assets - Managed by copilot-assets CLI",
         ".github/copilot-instructions.md",
+        ".github/instructions/",
         ".github/prompts/",
         ".github/agents/",
         ".github/skills/",
@@ -48,70 +49,6 @@ public sealed class GitService : IGitService
         catch
         {
             return false;
-        }
-    }
-
-    public bool IsClean(string path)
-    {
-        var repoRoot = GetRepositoryRoot(path);
-        if (repoRoot == null) return true;
-
-        try
-        {
-            using var repo = new Repository(repoRoot);
-            var status = repo.RetrieveStatus();
-            return !status.IsDirty;
-        }
-        catch
-        {
-            return true;
-        }
-    }
-
-    public void Stage(string repoPath, params string[] filePaths)
-    {
-        var repoRoot = GetRepositoryRoot(repoPath);
-        if (repoRoot == null) return;
-
-        using var repo = new Repository(repoRoot);
-        foreach (var filePath in filePaths)
-        {
-            // Convert to relative path from repo root
-            var relativePath = Path.GetRelativePath(repoRoot, filePath);
-            LibGit2Sharp.Commands.Stage(repo, relativePath);
-        }
-    }
-
-    public void Commit(string repoPath, string message)
-    {
-        var repoRoot = GetRepositoryRoot(repoPath);
-        if (repoRoot == null) return;
-
-        using var repo = new Repository(repoRoot);
-
-        // Check if there are any changes to commit
-        var status = repo.RetrieveStatus();
-        if (!status.Any(s => s.State != FileStatus.Ignored && s.State != FileStatus.Unaltered))
-        {
-            // No changes to commit - this is fine, just return
-            return;
-        }
-
-        // Get or create signature
-        var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
-        if (signature == null)
-        {
-            signature = new Signature("Copilot Assets CLI", "copilot-assets@local", DateTimeOffset.Now);
-        }
-
-        try
-        {
-            repo.Commit(message, signature, signature);
-        }
-        catch (EmptyCommitException)
-        {
-            // No changes to commit - this is fine, just return
-            return;
         }
     }
 

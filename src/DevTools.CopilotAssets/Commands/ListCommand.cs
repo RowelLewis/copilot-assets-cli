@@ -101,6 +101,12 @@ public sealed class ListCommand : BaseCommand
             Console.WriteLine($"Source: {sourceDesc}");
         }
 
+        // Show targets if multiple are configured
+        if (result.Targets != null && result.Targets.Count > 0)
+        {
+            Console.WriteLine($"Targets: {string.Join(", ", result.Targets)}");
+        }
+
         Console.WriteLine();
         Console.WriteLine("Type          Name                      Status");
         Console.WriteLine("────────────────────────────────────────────────────");
